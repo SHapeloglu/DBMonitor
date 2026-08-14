@@ -6,31 +6,24 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 ## Faz 6 — Production hazırlık
 
-### Hemen yap (Kritik)
 | # | Görev | Durum |
 |---|---|---|
-| F6-02 | ✅ Secrets yönetimi — Vault kuruldu | Tamamlandı. Vault dev mode, credentials Vault'ta |
-| F6-04 | 🔄 Prometheus alert rules — severity=3 → Alertmanager | Devam ediyor |
-| F6-06 | ⬜ Dokümantasyon — adapter README + örnek config | Yapılmadı |
-
-### Gerekirse yap (Düşük)
-| # | Görev | Neden |
-|---|---|---|
-| F6-01 | Kubernetes Helm chart | Prod migrate kararı verilince |
-| F6-05 | Horizontal scaling — Redis | Şu an single instance yeterli |
+| F6-02 | ✅ Secrets yönetimi — Vault | Tamamlandı. Vault dev mode + 5 DB credential |
+| F6-04 | ⬜ Prometheus alert rules | Yapılmadı |
+| F6-06 | ⬜ Dokümantasyon | Yapılmadı |
+| F6-01 | ⬜ Kubernetes Helm chart | Gerekirse |
+| F6-05 | ⬜ Redis scaling | Gerekirse |
 
 ---
 
 ## Açık kararlar
 
-| # | Karar | Durum | Not |
-|---|---|---|---|
-| K-02 | Secrets yönetimi | ✅ Vault | Dev mode, production için sealed mode gerekir |
+| # | Karar | Durum |
+|---|---|---|
+| K-02 | Secrets yönetimi | ✅ Vault |
 
 ---
 
-## Tamamlanan görevler — Bu oturum
+## Sonraki adım
 
-| Görev | Detay |
-|---|---|
-| F6-02 Vault Setup | Docker container, hvac client, 5 DB credential'ı Vault'ta, adapter_registry.py entegrasyonu |
+F6-04 Prometheus alert rules
