@@ -1,0 +1,68 @@
+databases:
+  - name: prod-postgresql
+    adapter: adapters.postgresql_adapter.PostgreSQLAdapter
+    host: postgres
+    port: 5432
+    db_name: dwhmonitor
+    db_type: postgresql
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: true
+    credentials: vault://db/postgres-local
+
+  - name: prod-mssql
+    adapter: adapters.mssql_adapter.MSSQLAdapter
+    host: 10.0.0.5
+    port: 1433
+    db_name: DWH_PROD
+    db_type: mssql
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials: vault://db/mssql-prod
+
+  - name: prod-mysql
+    adapter: adapters.mysql_adapter.MySQLAdapter
+    host: 10.0.0.6
+    port: 3306
+    db_name: DWH_PROD
+    db_type: mysql
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials: vault://db/mysql-prod
+
+  - name: prod-mariadb
+    adapter: adapters.mysql_adapter.MySQLAdapter
+    host: 10.0.0.7
+    port: 3306
+    db_name: DWH_PROD
+    db_type: mariadb
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials: vault://db/mariadb-prod
+
+  - name: prod-oracle
+    adapter: adapters.oracle_adapter.OracleAdapter
+    host: 10.0.0.8
+    port: 1521
+    db_name: DWHORACLE
+    service_name: DWHORACLE
+    db_type: oracle
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials: vault://db/oracle-prod
+
+  - name: generic-odbc-fallback
+    adapter: adapters.generic_odbc_adapter.GenericODBCAdapter
+    host: 10.0.0.99
+    port: 0
+    db_name: UNKNOWN_DB
+    db_type: generic_odbc
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    connection_string: ""
+    credentials: vault://db/generic-odbc

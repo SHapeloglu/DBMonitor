@@ -1,0 +1,67 @@
+version: "3.9"
+services:
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault-dev
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    volumes:
+      - vault_data:/vault/data
+    networks:
+      - dwh-net
+
+  postgres:
+    image: postgres:16
+    container_name: dq-postgres
+    environment:
+      POSTGRES_USER: dquser
+      POSTGRES_PASSWORD: dqpass
+      POSTGRES_DB: dqmetrics
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./sql/dwh_health_log.sql:/docker-entrypoint-initdb.d/01_dwh_health_log.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - dwh-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dquser -d dqmetrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dwh-monitor:
+    build: .
+    container_name: dwh-monitor
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./config:/app/config
+      - ./archive:/app/archive
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=dwhmonitor
+      - DB_USER=dquser
+      - DB_PASS=dqpass
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dwh-net
+    restart: unless-stopped
+
+networks:
+  dwh-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  vault_data:
