@@ -1,0 +1,22 @@
+databases:
+  - name: prod-postgresql
+    adapter: adapters.postgresql_adapter.PostgreSQLAdapter
+    host: postgres
+    port: 5432
+    db_name: dwhmonitor
+    db_type: postgresql
+    enabled: true
+    credentials:
+      user: dquser
+      password: dqpass
+
+  - name: prod-mssql
+    adapter: adapters.mssql_adapter.MSSQLAdapter
+    host: 10.0.0.5
+    port: 1433
+    db_name: DWH_PROD
+    db_type: mssql
+    enabled: false
+    credentials:
+      user: etl_svc
+      password: changeme

@@ -1,0 +1,18 @@
+# Local Documentation
+docs/*.md
+docs-*.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+VAULT_TOKEN
+
+# Runtime
+archive/
+*.log
