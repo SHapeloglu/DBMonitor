@@ -1,0 +1,57 @@
+# =============================================================================
+# notifications.yaml — Bildirim Kanalları Konfigürasyonu
+# =============================================================================
+# Desteklenen kanallar: smtp, slack_webhook, webhook, pagerduty, teams_webhook
+# threshold: Python expr — severity (int), kategori (str), sonuc (str)
+# =============================================================================
+
+notifications:
+
+  # ---------------------------------------------------------------------------
+  # SMTP — severity=3 kritik uyarılar için
+  # ---------------------------------------------------------------------------
+  - channel: smtp
+    enabled: false              # Gerçek SMTP bilgisi girince true yap
+    threshold: "severity >= 3"
+    smtp_host: mail.kurum.com
+    smtp_port: 587
+    smtp_user: dwh-monitor@kurum.com
+    smtp_password: changeme
+    from: dwh-monitor@kurum.com
+    to:
+      - dwh-team@kurum.com
+
+  # ---------------------------------------------------------------------------
+  # Slack — severity=2+ uyarılar için
+  # ---------------------------------------------------------------------------
+  - channel: slack_webhook
+    enabled: false
+    threshold: "severity >= 2"
+    webhook_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+  # ---------------------------------------------------------------------------
+  # Generic Webhook — harici sistemlere (ITSM, custom alerting)
+  # ---------------------------------------------------------------------------
+  - channel: webhook
+    enabled: false
+    threshold: "severity >= 3"
+    webhook_url: http://localhost:9000/alerts
+    headers:
+      Content-Type: application/json
+      Authorization: Bearer changeme
+
+  # ---------------------------------------------------------------------------
+  # PagerDuty — güvenlik tehdidi için (örnek)
+  # ---------------------------------------------------------------------------
+  # - channel: pagerduty
+  #   enabled: false
+  #   threshold: "severity == 3 and kategori == 'guvenlik'"
+  #   integration_key: YOUR_PAGERDUTY_KEY
+
+  # ---------------------------------------------------------------------------
+  # Microsoft Teams (örnek)
+  # ---------------------------------------------------------------------------
+  # - channel: teams_webhook
+  #   enabled: false
+  #   threshold: "severity >= 2"
+  #   webhook_url: https://outlook.office.com/webhook/XXX

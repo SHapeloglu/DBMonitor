@@ -1,0 +1,100 @@
+# =============================================================================
+# prometheus-rules.yml — DWH Health Alert Rules
+# =============================================================================
+# Prod'da bu dosya şu konuma mount edilir:
+#   /etc/prometheus/rules/dwh-health.yml
+# Docker Compose'da: config/prometheus/rules/dwh-health.yml
+# =============================================================================
+
+groups:
+  - name: dwh_health_alerts
+    interval: 30s
+    rules:
+
+      # -----------------------------------------------------------------------
+      # Herhangi bir adapter'dan severity=3 — 5 dakika boyunca
+      # -----------------------------------------------------------------------
+      - alert: DWHCriticalHealthIssue
+        expr: dwh_health_check{severity="3"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "🚨 Kritik DWH Sağlık Sorunu — {{ $labels.kontrol_kodu }}"
+          description: |
+            {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
+            Kontrol: {{ $labels.kontrol_adi }}
+            Kategori: {{ $labels.kategori }}
+            Severity: 3 (Kritik)
+
+      # -----------------------------------------------------------------------
+      # Güvenlik tehdidi — 1 dakika tolerans (hızlı yanıt gerektirir)
+      # -----------------------------------------------------------------------
+      - alert: DWHSecurityThreat
+        expr: dwh_health_check{kategori="guvenlik", severity="3"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "🔒 GÜVENLIK TEHDIDI — {{ $labels.kontrol_kodu }}"
+          description: |
+            Hassas veri koruması ihlali:
+            {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
+
+      # -----------------------------------------------------------------------
+      # Pipeline kırılması — 10 dakika boyunca veri gelmiyor
+      # -----------------------------------------------------------------------
+      - alert: DWHPipelineBreakdown
+        expr: dwh_health_check{kategori="pipeline", severity="3"} > 0
+        for: 10m
+        labels:
+          severity: critical
+          category: pipeline
+        annotations:
+          summary: "⚠️ Pipeline Kırılması — {{ $labels.kontrol_kodu }}"
+          description: |
+            Veri yükleme başarısız:
+            {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
+
+      # -----------------------------------------------------------------------
+      # Genel uyarı — severity=2, 15 dakika boyunca
+      # -----------------------------------------------------------------------
+      - alert: DWHWarningIssue
+        expr: dwh_health_check{severity="2"} > 0
+        for: 15m
+        labels:
+          severity: warning
+          category: general
+        annotations:
+          summary: "⚠️ DWH Uyarısı — {{ $labels.kontrol_kodu }}"
+          description: |
+            {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
+            Kontrol: {{ $labels.kontrol_adi }}
+
+      # -----------------------------------------------------------------------
+      # Sistem çapı kriz — 3'ten fazla kritik sorun aynı anda
+      # -----------------------------------------------------------------------
+      - alert: DWHMultipleCategoriesCritical
+        expr: count(dwh_health_check{severity="3"}) > 3
+        for: 10m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "🔴 SİSTEM ÇAPI KRİZ"
+          description: "{{ $value }} kategoride kritik sorun aynı anda aktif"
+
+      # -----------------------------------------------------------------------
+      # Tüm adapter'lar yanıt vermiyor
+      # -----------------------------------------------------------------------
+      - alert: DWHAllAdaptersDown
+        expr: count(dwh_health_check) == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "🔴 TÜM ADAPTER'LAR YANIT VERMİYOR"
+          description: "Collector engine'de kritik sorun — hiç metrik gelmiyor"

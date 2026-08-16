@@ -1,21 +1,102 @@
+# =============================================================================
+# databases.yaml — DWH Monitor Adapter Configuration
+# =============================================================================
+# Her DB için bir blok ekle, adapter sınıfını belirt ve enabled: true yap.
+# Yeni DB eklemek = bu dosyaya blok + adapters/ altına ~150 satır Python.
+# =============================================================================
+
 databases:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Referans adapter (aktif)
+  # ---------------------------------------------------------------------------
   - name: prod-postgresql
     adapter: adapters.postgresql_adapter.PostgreSQLAdapter
     host: postgres
     port: 5432
     db_name: dwhmonitor
     db_type: postgresql
+    connect_timeout_s: 10
+    query_timeout_s: 30
     enabled: true
     credentials:
       user: dquser
-      password: dqpass
+      password: dqpass          # prod'da Vault: vault://secret/dwh/postgresql
 
+  # ---------------------------------------------------------------------------
+  # MSSQL Server — ODBC Driver 18 gerektirir
+  # ---------------------------------------------------------------------------
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
     host: 10.0.0.5
     port: 1433
     db_name: DWH_PROD
     db_type: mssql
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false              # Gerçek bağlantı bilgisi gelince true yap
+    credentials:
+      user: etl_svc
+      password: changeme        # vault://secret/dwh/mssql
+
+  # ---------------------------------------------------------------------------
+  # MySQL — Community Edition, pymysql driver
+  # ---------------------------------------------------------------------------
+  - name: prod-mysql
+    adapter: adapters.mysql_adapter.MySQLAdapter
+    host: 10.0.0.8
+    port: 3306
+    db_name: dwh_prod
+    db_type: mysql
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials:
+      user: etl_svc
+      password: changeme        # vault://secret/dwh/mysql
+
+  # ---------------------------------------------------------------------------
+  # MariaDB — mysql_adapter.py paylaşılır, db_type: mariadb ile ayrışır
+  # ---------------------------------------------------------------------------
+  - name: prod-mariadb
+    adapter: adapters.mysql_adapter.MySQLAdapter
+    host: 10.0.0.9
+    port: 3306
+    db_name: dwh_prod
+    db_type: mariadb
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials:
+      user: etl_svc
+      password: changeme        # vault://secret/dwh/mariadb
+
+  # ---------------------------------------------------------------------------
+  # Oracle — python-oracledb Thin mode (Oracle Client kurulumu gerekmez)
+  # ---------------------------------------------------------------------------
+  - name: prod-oracle
+    adapter: adapters.oracle_adapter.OracleAdapter
+    host: 10.0.0.6
+    port: 1521
+    service_name: DWHORACLE
+    db_type: oracle
+    connect_timeout_s: 10
+    query_timeout_s: 30
+    enabled: false
+    credentials:
+      user: etl_svc
+      password: changeme        # vault://secret/dwh/oracle
+
+  # ---------------------------------------------------------------------------
+  # Generic ODBC — Fallback: tanınmayan / özel DB'ler
+  # connection_string veya dsn kullanılabilir
+  # ---------------------------------------------------------------------------
+  - name: generic-odbc-fallback
+    adapter: adapters.generic_odbc_adapter.GenericODBCAdapter
+    connection_string: "Driver={ODBC Driver 18 for SQL Server};Server=.;Database=master;"
+    db_type: generic_odbc
+    connect_timeout_s: 10
+    query_timeout_s: 30
     enabled: false
     credentials:
       user: etl_svc

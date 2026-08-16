@@ -1,0 +1,18 @@
+# =============================================================================
+# retention.yaml — Log Saklama Politikası
+# =============================================================================
+# RetentionManager bu dosyayı okur.
+# 24 ay aktif saklama → cold storage arşiv.
+# Arşiv backend: local | s3 | azure_blob
+# =============================================================================
+
+active_months: 24
+archive_backend: local          # Prod için: s3 veya azure_blob önerilir
+archive_path: /opt/dwh-db-monitor/archive
+batch_size: 10000               # Her arşiv turunda işlenecek satır sayısı
+dry_run: false                  # true → silme yapmaz, sadece raporlar
+
+# S3 örneği:
+# archive_backend: s3
+# archive_path: s3://kurum-dwh-archive/health-logs
+# aws_region: eu-central-1
