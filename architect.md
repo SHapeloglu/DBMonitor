@@ -62,3 +62,12 @@ Load time'da adapter_registry şifreleri Vault'tan çeker.
 - Dev mode: in-memory, restart'ta kaybolur
 - Use sealed mode + file/Raft/S3 backend for production
 - Service account token + audit logging required
+
+---
+
+## 10. F6-06 Dokümantasyon — Production-Ready Configs
+
+`docs/config/` altında 7 YAML dosyası ve `docs/sql/` altında DDL şeması.
+Tüm deployment artifact'ları annotated, örnek değerler ve Vault path'ları ile hazır.
+
+**docs/README.md** gitignore'da — sadece YAML + SQL push edilir.

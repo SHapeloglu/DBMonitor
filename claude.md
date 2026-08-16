@@ -51,3 +51,17 @@ Merkezi secrets yönetimi gerekli.
 
 ### Next
 F6-04 Prometheus alert rules devam et.
+
+---
+
+## F6-06 Dokümantasyon — Tamamlandı ✅
+
+**2026-08-16 — F6-06 Tamamlandı**
+
+7 YAML config file + SQL schema + README:
+- Tümü production-ready, fully annotated
+- Vault secret path örnekleri, plain-text backup notları
+- GitHub: docs/config/, docs/sql/
+- Push: commit 24ae3b7
+
+**Next: F6-01 (Helm) veya Rakip Analizi?**
