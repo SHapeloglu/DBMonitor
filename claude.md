@@ -65,3 +65,28 @@ F6-04 Prometheus alert rules devam et.
 - Push: commit 24ae3b7
 
 **Next: F6-01 (Helm) veya Rakip Analizi?**
+
+---
+
+## GitHub README.md — Tamamlandı ✅
+
+**2026-08-16 — Kapsamlı GitHub README push edildi**
+
+Commit: e7a1183 — README.md (389 satır)
+
+İçerik:
+- Badges (Python, FastAPI, PostgreSQL, Prometheus, Docker)
+- ASCII architecture diagram
+- Health check categories tablosu (FR-COST/DQ/PIPE/USER/SEC)
+- Supported adapters tablosu (6 adapter + driver + status)
+- Quick start (4 adım)
+- Configuration örnekleri (databases.yaml, notifications.yaml)
+- API endpoints + Prometheus örnek çıktı
+- Alert rules tablosu (6 kural)
+- Database schema özeti (DDL, partitions, views)
+- Adding a new database (3 adım, Teradata örneği)
+- Vault integration notu
+- Project status tablosu
+- Tech stack tablosu
+
+**Next: F6-01 (Helm) veya Rakip Analizi veya F3-04/05/06 (API log endpoints)**

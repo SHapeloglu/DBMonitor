@@ -141,3 +141,11 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | 2026-08 | Vault integration (F6-02) | HashiCorp Vault dev mode, credentials YAML backup |
 | 2026-08 | Prometheus alerts (F6-04) | 6 alert rule, Alertmanager, dwh-health.yml |
 | 2026-08-16 | Dokümantasyon (F6-06) | 7 YAML config, SQL schema, README, GitHub push |
+
+---
+
+## Tamamlanan görevler (ek)
+
+| Tarih | Görev | Detay |
+|---|---|---|
+| 2026-08-16 | GitHub README.md | 389 satır, kapsamlı proje dokümantasyonu, commit e7a1183 |

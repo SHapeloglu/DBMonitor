@@ -151,3 +151,23 @@ Production'da şifreler düz text'te, Git repo'ya push olabiliyor.
 2. **Rakip analizi** (Datadog, Grafana, SolarWinds, OpsRamp vs dwh-db-monitor)
 3. **DB2/MongoDB/Teradata adapter'ları** (rakip analizi sonrası öncelik)
 4. **F3-04/05/06 — API log endpoint'leri** (/logs, /logs/summary, /adapters)
+
+---
+
+## Oturum 12 — GitHub README.md
+
+### Yapılanlar
+- Kapsamlı GitHub README.md oluşturuldu (14.8 KB, 389 satır)
+- Base64 yöntemiyle sunucuya yazıldı (backtick/heredoc çakışması nedeniyle)
+- Commit: e7a1183 → main
+
+### README İçeriği
+- Badges, architecture diagram (ASCII), features, health check categories
+- Supported databases tablosu, quick start, configuration örnekleri
+- API endpoints, alerting (6 rule), database schema, adding new DB
+- Ports, Vault integration, retention, project status, tech stack
+
+### Sonraki Oturum Seçenekleri
+1. F6-01 — Kubernetes Helm chart
+2. Rakip analizi (Datadog, Grafana, SolarWinds, OpsRamp)
+3. F3-04/05/06 — API log endpoints (/logs, /logs/summary, /adapters)

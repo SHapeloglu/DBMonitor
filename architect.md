@@ -71,3 +71,11 @@ Load time'da adapter_registry şifreleri Vault'tan çeker.
 Tüm deployment artifact'ları annotated, örnek değerler ve Vault path'ları ile hazır.
 
 **docs/README.md** gitignore'da — sadece YAML + SQL push edilir.
+
+---
+
+## 11. GitHub README.md
+
+Repo ana sayfasında kapsamlı README yayında.
+Mimari diagram, adapter tablosu, quick start, API docs, alert rules dahil.
+Commit: e7a1183
