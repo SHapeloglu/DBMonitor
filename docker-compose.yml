@@ -4,7 +4,7 @@ services:
     image: hashicorp/vault:latest
     container_name: vault-dev
     ports:
-      - "8200:8200"
+      - "127.0.0.1:8200:8200"
     environment:
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
     cap_add:
@@ -26,7 +26,7 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./sql/dwh_health_log.sql:/docker-entrypoint-initdb.d/01_dwh_health_log.sql
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     networks:
       - dwh-net
     healthcheck:
@@ -39,7 +39,7 @@ services:
     build: .
     container_name: dwh-monitor
     ports:
-      - "8005:8005"
+      - "127.0.0.1:8005:8005"
     volumes:
       - ./config:/app/config
       - ./archive:/app/archive
@@ -58,6 +58,41 @@ services:
       - dwh-net
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dwh-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - dwh-net
+    depends_on:
+      - dwh-monitor
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: dwh-alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/config.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - dwh-net
+    restart: unless-stopped
+
 networks:
   dwh-net:
     driver: bridge
@@ -65,3 +100,5 @@ networks:
 volumes:
   pg_data:
   vault_data:
+  prometheus_data:
+  alertmanager_data:

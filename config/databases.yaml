@@ -8,7 +8,9 @@ databases:
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: true
-    credentials: vault://db/postgres-local
+    credentials:
+      user: dquser
+      password: dqpass
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
@@ -19,50 +21,56 @@ databases:
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
-    credentials: vault://db/mssql-prod
+    credentials:
+      user: etl_svc
+      password: changeme
 
   - name: prod-mysql
     adapter: adapters.mysql_adapter.MySQLAdapter
-    host: 10.0.0.6
+    host: 10.0.0.8
     port: 3306
-    db_name: DWH_PROD
+    db_name: dwh_prod
     db_type: mysql
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
-    credentials: vault://db/mysql-prod
+    credentials:
+      user: etl_svc
+      password: changeme
 
   - name: prod-mariadb
     adapter: adapters.mysql_adapter.MySQLAdapter
-    host: 10.0.0.7
+    host: 10.0.0.9
     port: 3306
-    db_name: DWH_PROD
+    db_name: dwh_prod
     db_type: mariadb
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
-    credentials: vault://db/mariadb-prod
+    credentials:
+      user: etl_svc
+      password: changeme
 
   - name: prod-oracle
     adapter: adapters.oracle_adapter.OracleAdapter
-    host: 10.0.0.8
+    host: 10.0.0.6
     port: 1521
-    db_name: DWHORACLE
     service_name: DWHORACLE
     db_type: oracle
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
-    credentials: vault://db/oracle-prod
+    credentials:
+      user: etl_svc
+      password: changeme
 
   - name: generic-odbc-fallback
     adapter: adapters.generic_odbc_adapter.GenericODBCAdapter
-    host: 10.0.0.99
-    port: 0
-    db_name: UNKNOWN_DB
+    connection_string: "Driver={ODBC Driver 18 for SQL Server};Server=.;Database=master;"
     db_type: generic_odbc
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
-    connection_string: ""
-    credentials: vault://db/generic-odbc
+    credentials:
+      user: etl_svc
+      password: changeme
