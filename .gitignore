@@ -16,3 +16,7 @@ VAULT_TOKEN
 # Runtime
 archive/
 *.log
+
+# Backups
+*.bak
+*.backup
