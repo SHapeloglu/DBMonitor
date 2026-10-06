@@ -1,56 +1,56 @@
 
 ---
 
-## F6-02 Vault Integration (New)
+## F6-02 Vault Entegrasyonu (Yeni)
 
 Secrets merkezi yönetimi için HashiCorp Vault entegrasyonu yapıldı.
 
-### Design Decision
-- **Why**: Şifreler düz text'te → security risk + Git exposure
-- **How**: Vault KV v2 + hvac client + adapter_registry hook
-- **When**: Load time (adapter registry'de credentials resolve)
+### Tasarım Kararı
+- **Neden**: Şifreler düz metinde → güvenlik riski + Git'te ifşa
+- **Nasıl**: Vault KV v2 + hvac istemcisi + adapter_registry kancası
+- **Ne zaman**: Yükleme anında (kimlik bilgileri adapter registry'de çözümlenir)
 
-### Scope
-- Database credentials only (5 adapters × {user, password})
-- No application secrets (yet)
-- No dynamic credentials (yet)
+### Kapsam
+- Yalnızca veritabanı kimlik bilgileri (5 adaptör × {user, password})
+- Uygulama sırları yok (henüz)
+- Dinamik kimlik bilgisi yok (henüz)
 
-### Dev vs Prod
-- **Dev mode**: in-memory, auto-unseal, auto-generate token
-- **Prod mode**: sealed, file/Raft backend, service account token, audit logs
+### Dev ve Prod
+- **Dev modu**: bellek içi, otomatik unseal, otomatik token üretimi
+- **Prod modu**: sealed, file/Raft backend, servis hesabı token'ı, denetim logları
 
-### Note
-Vault token hardcoded in code is anti-pattern. Use:
+### Not
+Vault token'ını koda gömmek anti-pattern'dir. Bunun yerine kullan:
 - Kubernetes auth
 - AWS IAM auth
-- Environment variable + .gitignore
+- Ortam değişkeni + .gitignore
 
 ---
 
-## F6-02 Vault Integration (Oturum 11)
+## F6-02 Vault Entegrasyonu (Oturum 11)
 
-### Why Vault?
-Production'da şifreler düz text → security risk + Git exposure.
-Merkezi secrets yönetimi gerekli.
+### Neden Vault?
+Üretimde şifreler düz metin → güvenlik riski + Git'te ifşa.
+Merkezi sır yönetimi gerekli.
 
-### What Changed
-- Docker: Vault container (dev mode)
-- Python: hvac client + adapter_registry entegrasyonu
-- Config: databases.yaml vault:// referansları
-- Deployment: VAULT_ADDR + VAULT_TOKEN env vars
+### Neler Değişti
+- Docker: Vault konteyneri (dev modu)
+- Python: hvac istemcisi + adapter_registry entegrasyonu
+- Yapılandırma: databases.yaml vault:// referansları
+- Kurulum: VAULT_ADDR + VAULT_TOKEN ortam değişkenleri
 
-### How It Works
+### Nasıl Çalışır
 1. adapter_registry.load_all() başladığında
 2. Her DB config için _resolve_credentials() çağırılır
 3. credentials: vault://db/name ise Vault'tan çeker
-4. DB adapter şifreli credentials ile connect() yapır
+4. DB adaptörü çözümlenen kimlik bilgileriyle connect() yapar
 
-### Dev vs Prod
-- Dev: in-memory, auto-unseal, easy testing
-- Prod: sealed mode, persistent backend, audit logs
+### Dev ve Prod
+- Dev: bellek içi, otomatik unseal, kolay test
+- Prod: sealed mod, kalıcı backend, denetim logları
 
-### Next
-F6-04 Prometheus alert rules devam et.
+### Sonraki
+F6-04 Prometheus alarm kurallarıyla devam et.
 
 ---
 

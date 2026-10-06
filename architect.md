@@ -1,9 +1,9 @@
 
 ---
 
-## 10. Secrets Management — Vault Integration (F6-02)
+## 10. Sır Yönetimi — Vault Entegrasyonu (F6-02)
 
-### Vault Architecture
+### Vault Mimarisi
 
 databases.yaml (credentials: vault://db/name)
 ↓
@@ -19,49 +19,49 @@ adapter.init() → connect()
 ### Vault Kurulumu
 - Image: hashicorp/vault:latest
 - Port: 8200
-- Mode: dev (in-memory, auto-unseal)
+- Mod: dev (bellek içi, otomatik unseal)
 - KV v2 mount: secret/
 
-### Implementation
-- Lazy-load: _vault_client singleton
-- Fallback: Vault unavailable → credentials unchanged
-- Both formats supported:
-  - credentials: vault://db/name (entire dict)
-  - credentials: {password: vault://db/name} (individual field)
+### Uygulama
+- Tembel yükleme: _vault_client singleton
+- Yedek: Vault erişilemezse → kimlik bilgileri değiştirilmeden kalır
+- İki format da destekleniyor:
+  - credentials: vault://db/name (sözlüğün tamamı)
+  - credentials: {password: vault://db/name} (tek alan)
 
-### Production Considerations
-- Dev mode data evaporates on restart
-- Use sealed mode + persistent backend (file/Raft/S3)
-- Service account token + audit logging
+### Üretim Değerlendirmeleri
+- Dev modu verisi yeniden başlatmada kaybolur
+- Sealed mod + kalıcı backend (file/Raft/S3) kullan
+- Servis hesabı token'ı + denetim loglaması
 
 ---
 
-## 10. Secrets Management — Vault Integration
+## 10. Sır Yönetimi — Vault Entegrasyonu
 
-### Architecture
-Vault KV v2 secrets → adapter_registry → db credentials
+### Mimari
+Vault KV v2 sırları → adapter_registry → db kimlik bilgileri
 
-### Components
-- Vault container (port 8200, dev mode)
-- hvac client (Python)
+### Bileşenler
+- Vault konteyneri (port 8200, dev modu)
+- hvac istemcisi (Python)
 - Policy: db-credentials (path "secret/data/db/*")
-- Secrets: 5 DB credentials (mssql, mysql, mariadb, oracle, postgres)
+- Sırlar: 5 DB kimlik bilgisi (mssql, mysql, mariadb, oracle, postgres)
 
-### Implementation
+### Uygulama
 adapter_registry.py:
 - _get_vault_client(): Lazy-load hvac.Client
 - _resolve_vault_secret(path): Vault'tan secret çek
 - _resolve_credentials(db_conf): credentials'ta vault:// varsa resolve et
 
-### Usage
+### Kullanım
 databases.yaml:
 credentials: vault://db/postgres-local
 Load time'da adapter_registry şifreleri Vault'tan çeker.
 
-### Production Notes
-- Dev mode: in-memory, restart'ta kaybolur
-- Use sealed mode + file/Raft/S3 backend for production
-- Service account token + audit logging required
+### Üretim Notları
+- Dev modu: bellek içi, restart'ta kaybolur
+- Üretimde sealed mod + file/Raft/S3 backend kullan
+- Servis hesabı token'ı + denetim loglaması gerekli
 
 ---
 

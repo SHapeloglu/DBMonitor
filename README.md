@@ -1,6 +1,6 @@
 # DWH DB Monitor
 
-> Production-ready multi-database Data Warehouse health monitoring platform
+> Üretime hazır, çok veritabanlı Veri Ambarı sağlık izleme platformu
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
@@ -9,26 +9,25 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-DWH DB Monitor is a plugin-based health monitoring platform that continuously checks the quality, cost, pipeline integrity, security, and user behavior of your Data Warehouse databases. It supports PostgreSQL, MSSQL, MySQL, MariaDB, Oracle, and any ODBC-compatible database out of the box — and adding a new one takes roughly 150 lines of Python and 3 lines of YAML.
+DWH DB Monitor, Veri Ambarı veritabanlarınızın kalitesini, maliyetini, pipeline bütünlüğünü, güvenliğini ve kullanıcı davranışını sürekli kontrol eden eklenti tabanlı bir sağlık izleme platformudur. PostgreSQL, MSSQL, MySQL, MariaDB, Oracle ve ODBC uyumlu her veritabanını kutudan çıktığı gibi destekler — yeni bir veritabanı eklemek kabaca 150 satır Python ve 3 satır YAML gerektirir.
 
 ---
 
-## Table of Contents
+## İçindekiler
 
-- [Architecture](#architecture)
-- [Features](#features)
-- [Health Check Categories](#health-check-categories)
-- [Supported Databases](#supported-databases)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [API Endpoints](#api-endpoints)
-- [Alerting](#alerting)
-- [Adding a New Database](#adding-a-new-database)
-- [Project Status](#project-status)
+- [Mimari](#mimari)
+- [Özellikler](#özellikler)
+- [Sağlık Kontrolü Kategorileri](#sağlık-kontrolü-kategorileri)
+- [Hızlı Başlangıç](#hızlı-başlangıç)
+- [Yapılandırma](#yapılandırma)
+- [API Endpoint'leri](#api-endpointleri)
+- [Alarmlar](#alarmlar)
+- [Yeni Veritabanı Ekleme](#yeni-veritabanı-ekleme)
+- [Proje Durumu](#proje-durumu)
 
 ---
 
-## Architecture
+## Mimari
 
 ```
 +----------------------------------------------------------------+
@@ -63,83 +62,90 @@ DWH DB Monitor is a plugin-based health monitoring platform that continuously ch
                   (direct SQL connection to dwh_health_log)
 ```
 
-**Key design principle:** The Collector Engine never knows the database type. It only calls `adapter.collect_metrics()`. Adding a new database requires no changes to the engine.
+(Kaynak veritabanları yerel sürücülerle Collector Engine'e bağlanır. Engine, YAML ile yönetilen AdapterRegistry üzerinden adaptörleri yükler; sonuçlar 24 ay bölümlenmiş `dwh_health_log` tablosuna ve Prometheus formatındaki `/metrics` endpoint'ine yazılır. Raporlama araçları tabloya doğrudan SQL ile bağlanır.)
+
+**Temel tasarım ilkesi:** Collector Engine veritabanı türünü asla bilmez; yalnızca `adapter.collect_metrics()` çağırır. Yeni veritabanı eklemek engine'de değişiklik gerektirmez.
 
 ---
 
-## Features
+## Özellikler
 
-- **Plugin architecture** — DBAdapter ABC + AdapterRegistry; new DB = ~150 lines Python + 3 lines YAML
-- **Two output points** — `dwh_health_log` PostgreSQL table (SQL-queryable) + `/metrics` HTTP endpoint (Prometheus format); no dashboard lock-in
-- **5 check categories** — Cost, Data Quality, Pipeline, User Behavior, Security
-- **Independent Notifier** — SMTP, Slack, PagerDuty, Teams, generic webhook; no DB-specific stored procedures
-- **Central RetentionManager** — 24-month active storage + cold archive (local / S3 / Azure Blob)
-- **Circuit breaker** — per-adapter failure isolation; 3 consecutive failures open the circuit
-- **Prometheus + Alertmanager** — 6 pre-built alert rules (critical, security, pipeline, warning, crisis, all-adapters-down)
-- **HashiCorp Vault** — credential resolution via `vault://` URI format
-
----
-
-## Health Check Categories
-
-| Code | Category | What It Checks | Severity |
-|------|----------|----------------|----------|
-| **FR-COST** | Cost | Unused tables (30+ days), table bloat, large unpartitioned tables | 2-3 |
-| **FR-DQ** | Data Quality | High NULL rate (>50%), missing PK/UNIQUE c
+- **Eklenti mimarisi** — DBAdapter ABC + AdapterRegistry; yeni DB = ~150 satır Python + 3 satır YAML
+- **İki çıkış noktası** — `dwh_health_log` PostgreSQL tablosu (SQL ile sorgulanabilir) + `/metrics` HTTP endpoint'i (Prometheus formatı); belirli bir panele bağımlılık yok
+- **5 kontrol kategorisi** — Maliyet, Veri Kalitesi, Pipeline, Kullanıcı Davranışı, Güvenlik
+- **Bağımsız Notifier** — SMTP, Slack, PagerDuty, Teams, genel webhook; DB'ye özgü stored procedure yok
+- **Merkezi RetentionManager** — 24 ay aktif saklama + soğuk arşiv (yerel / S3 / Azure Blob)
+- **Circuit breaker** — adaptör başına hata yalıtımı; ardışık 3 hata devreyi açar
+- **Prometheus + Alertmanager** — hazır 6 alarm kuralı (kritik, güvenlik, pipeline, uyarı, kriz, tüm adaptörler kapalı)
+- **HashiCorp Vault** — `vault://` URI formatıyla kimlik bilgisi çözümleme
 
 ---
 
-## Quick Start
+## Sağlık Kontrolü Kategorileri
 
-### Prerequisites
+| Kod | Kategori | Neyi Kontrol Eder |
+|------|----------|----------------|
+| **FR-COST** | Maliyet | Kullanılmayan tablolar (30+ gün), tablo şişmesi, bölümlenmemiş büyük tablolar |
+| **FR-DQ** | Veri Kalitesi | Yüksek NULL oranı (>%50), eksik PK/UNIQUE, format ihlalleri |
+| **FR-PIPE** | Pipeline | Günlük yükleme yok, şema değişiklikleri, mükerrer yüklemeler |
+| **FR-USER** | Kullanıcı Davranışı | Uzun süren sorgular, mesai dışı büyük sorgular |
+| **FR-SEC** | Güvenlik | Maskelenmemiş hassas kolonlar, yetkisiz erişim |
+
+Önem derecesi (severity): 1 = bilgi | 2 = uyarı | 3 = kritik
+
+---
+
+## Hızlı Başlangıç
+
+### Ön koşullar
 
 - Docker + Docker Compose v2
 - Git
 
-### 1. Clone
+### 1. Klonla
 
 ```bash
 git clone https://github.com/SHapeloglu/DBMonitor.git
 cd DBMonitor
 ```
 
-### 2. Configure
+### 2. Yapılandır
 
 ```bash
 cp docs/config/databases.yaml config/databases.yaml
-# Edit config/databases.yaml:
-#   - Set host, port, db_name, credentials for your database
-#   - Set enabled: true for adapters you want active
+# config/databases.yaml dosyasını düzenle:
+#   - veritabanın için host, port, db_name ve kimlik bilgilerini gir
+#   - etkin olmasını istediğin adaptörlerde enabled: true yap
 ```
 
-### 3. Start
+### 3. Başlat
 
 ```bash
-export VAULT_TOKEN=<your-vault-token>   # or leave empty if not using Vault
+export VAULT_TOKEN=<your-vault-token>   # Vault kullanmıyorsan boş bırak
 docker compose up -d --build
 ```
 
-### 4. Verify
+### 4. Doğrula
 
 ```bash
-# Health check
+# Sağlık kontrolü
 curl http://localhost:8005/health
 
-# Prometheus metrics
+# Prometheus metrikleri
 curl http://localhost:8005/metrics
 
-# Prometheus UI
+# Prometheus arayüzü
 open http://localhost:9090
 
-# Alertmanager UI
+# Alertmanager arayüzü
 open http://localhost:9093
 ```
 
 ---
 
-## Configuration
+## Yapılandırma
 
-All configuration lives in `config/`. Annotated reference copies are in `docs/config/`.
+Tüm yapılandırma `config/` altındadır. Açıklamalı referans kopyalar `docs/config/` içindedir.
 
 ### databases.yaml
 
@@ -156,7 +162,7 @@ databases:
     enabled: true
     credentials:
       user: dquser
-      password: dqpass          # or: vault://secret/dwh/postgresql
+      password: dqpass          # veya: vault://secret/dwh/postgresql
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
@@ -164,7 +170,7 @@ databases:
     port: 1433
     db_name: DWH_PROD
     db_type: mssql
-    enabled: false             # flip to true after setting credentials
+    enabled: false             # kimlik bilgilerini girdikten sonra true yap
     credentials:
       user: etl_svc
       password: changeme
@@ -186,57 +192,57 @@ notifications:
     webhook_url: https://hooks.slack.com/services/XXX/YYY/ZZZ
 ```
 
-### Config File Reference
+### Yapılandırma Dosyaları
 
-| File | Purpose |
+| Dosya | Amaç |
 |------|---------|
-| `config/databases.yaml` | DB adapter definitions |
-| `config/notifications.yaml` | Alert channels (SMTP, Slack, PagerDuty, Teams, webhook) |
-| `config/retention.yaml` | 24-month retention + cold archive backend |
-| `config/prometheus/prometheus.yml` | Prometheus scrape config |
-| `config/prometheus/rules/dwh-health.yml` | 6 Prometheus alert rules |
-| `config/alertmanager.yml` | Alertmanager routing and receivers |
+| `config/databases.yaml` | DB adaptör tanımları |
+| `config/notifications.yaml` | Alarm kanalları (SMTP, Slack, PagerDuty, Teams, webhook) |
+| `config/retention.yaml` | 24 ay saklama + soğuk arşiv backend'i |
+| `config/prometheus/prometheus.yml` | Prometheus scrape yapılandırması |
+| `config/prometheus/rules/dwh-health.yml` | 6 Prometheus alarm kuralı |
+| `config/alertmanager.yml` | Alertmanager yönlendirme ve alıcıları |
 
 ---
 
-## API Endpoints
+## API Endpoint'leri
 
-| Endpoint | Method | Description |
+| Endpoint | Metot | Açıklama |
 |----------|--------|-------------|
-| `/health` | GET | Adapter status and engine health |
-| `/metrics` | GET | Prometheus exposition format |
+| `/health` | GET | Adaptör durumu ve engine sağlığı |
+| `/metrics` | GET | Prometheus exposition formatı |
 
-### /metrics Sample Output
+### /metrics Örnek Çıktısı
 
 ```
 # HELP dwh_health_check DWH health check result
 # TYPE dwh_health_check gauge
-dvwh_health_check{db_type="postgresql",host="postgres",db_name="dwhmonitor",kategori="maliyet",kontrol_kodu="FR-COST-01",sonuc="WARNING"} 2
+dwh_health_check{db_type="postgresql",host="postgres",db_name="dwhmonitor",kategori="maliyet",kontrol_kodu="FR-COST-01",sonuc="WARNING"} 2
 dwh_health_check{db_type="postgresql",host="postgres",db_name="dwhmonitor",kategori="guvenlik",kontrol_kodu="FR-SEC-01",sonuc="OK"} 0
 ```
 
 ---
 
-## Alerting
+## Alarmlar
 
-6 pre-built Prometheus alert rules:
+Hazır 6 Prometheus alarm kuralı:
 
-| Alert | Condition | For | Severity |
+| Alarm | Koşul | Süre | Önem |
 |--------|-----------|-----|----------|
-| `DWHCriticalHealthIssue` | Any severity=3 metric | 5m | critical |
-| `DWHSecurityThreat` | Security category severity=3 | 1m | critical |
-| `DWHPipelineBreakdown` | Pipeline category severity=3 | 10m | critical |
-| `DWHWarningIssue` | Any severity=2 metric | 15m | warning |
-| `DWHMultipleCategoriesCritical` | More than 3 critical issues | 10m | critical |
-| `DWHAllAdaptersDown` | Zero metrics received | 5m | critical |
+| `DWHCriticalHealthIssue` | severity=3 olan herhangi bir metrik | 5m | critical |
+| `DWHSecurityThreat` | Güvenlik kategorisinde severity=3 | 1m | critical |
+| `DWHPipelineBreakdown` | Pipeline kategorisinde severity=3 | 10m | critical |
+| `DWHWarningIssue` | severity=2 olan herhangi bir metrik | 15m | warning |
+| `DWHMultipleCategoriesCritical` | 3'ten fazla kritik sorun | 10m | critical |
+| `DWHAllAdaptersDown` | Hiç metrik alınmıyor | 5m | critical |
 
-Configure receivers in `config/alertmanager.yml`.
+Alıcıları `config/alertmanager.yml` içinde yapılandır.
 
 ---
 
-## Database Schema
+## Veritabanı Şeması
 
-`dwh_health_log` — PostgreSQL 16, `monitor` schema
+`dwh_health_log` — PostgreSQL 16, `monitor` şeması
 
 ```sql
 CREATE TABLE monitor.dwh_health_log (
@@ -254,22 +260,22 @@ CREATE TABLE monitor.dwh_health_log (
     etkilenen_sayi   INTEGER,
     detay            TEXT,
     PRIMARY KEY (id, kontrol_tarihi)
-) PARTITION BY RANGE (kontrol_tarihi�;
+) PARTITION BY RANGE (kontrol_tarihi);
 ```
 
-- **24 monthly partitions** (2025-01 through 2026-12)
-- **5 indexes** optimized for dashboard and alert queries
-- **3 views:** `v_son_24s_ozet`, `v_aktif_sorunlar`, `v_trend_7gun`
-- **Archive table:** `dwh_health_log_archive` for rows older than 24 months
-- **Stored procedure:** `add_monthly_partition(date)` called by RetentionManager
+- **24 aylık bölüm** (2025-01'den 2026-12'ye)
+- Panel ve alarm sorguları için optimize edilmiş **5 index**
+- **3 view:** `v_son_24s_ozet`, `v_aktif_sorunlar`, `v_trend_7gun`
+- **Arşiv tablosu:** 24 aydan eski satırlar için `dwh_health_log_archive`
+- **Stored procedure:** RetentionManager'ın çağırdığı `add_monthly_partition(date)`
 
-Full DDL: [`docs/sql/dwh_health_log.sql`](docs/sql/dwh_health_log.sql)
+Tam DDL: [`docs/sql/dwh_health_log.sql`](docs/sql/dwh_health_log.sql)
 
 ---
 
-## Adding a New Database
+## Yeni Veritabanı Ekleme
 
-### Step 1 - Write the adapter (~150 lines)
+### Adım 1 - Adaptörü yaz (~150 satır)
 
 ```python
 # adapters/teradata_adapter.py
@@ -289,7 +295,7 @@ class TeradataAdapter(DBAdapter):
         return metrics
 ```
 
-### Step 2 - Add 3 lines to databases.yaml
+### Adım 2 - databases.yaml'a blok ekle
 
 ```yaml
   - name: prod-teradata
@@ -302,31 +308,31 @@ class TeradataAdapter(DBAdapter):
       password: changeme
 ```
 
-### Step 3 - Restart
+### Adım 3 - Yeniden başlat
 
 ```bash
 docker compose restart dwh-monitor
 ```
 
-No engine code changes. The new adapter is auto-discovered via AdapterRegistry.
+Engine kodunda değişiklik yok. Yeni adaptör AdapterRegistry üzerinden otomatik bulunur.
 
 ---
 
-## Ports
+## Portlar
 
-| Service | Port | Purpose |
+| Servis | Port | Amaç |
 |---------|------|---------|
 | dwh-monitor | 8005 | FastAPI - /health, /metrics |
-| Prometheus | 9090 | Metrics scraping + alert rule evaluation |
-| Alertmanager | 9093 | Alert routing and deduplication |
-| PostgreSQL | 5433 | dwh_health_log storage (host port) |
-| Vault | 8200 | Secrets management (dev mode) |
+| Prometheus | 9090 | Metrik toplama + alarm kuralı değerlendirme |
+| Alertmanager | 9093 | Alarm yönlendirme ve tekilleştirme |
+| PostgreSQL | 5433 | dwh_health_log depolama (host portu) |
+| Vault | 8200 | Sır yönetimi (dev modu) |
 
 ---
 
-## Vault Integration
+## Vault Entegrasyonu
 
-Credentials can be stored in HashiCorp Vault using the `vault://` URI format:
+Kimlik bilgileri `vault://` URI formatıyla HashiCorp Vault'ta saklanabilir:
 
 ```yaml
 credentials:
@@ -334,56 +340,56 @@ credentials:
   password: vault://secret/dwh/postgresql
 ```
 
-After Vault container restart (dev mode):
+Vault konteyneri yeniden başladıktan sonra (dev modu):
 
 ```bash
 export VAULT_TOKEN=<new-token>
-python vault-init.py          # run from host
+python vault-init.py          # host üzerinden çalıştır
 docker compose restart dwh-monitor
 ```
 
 ---
 
-## Retention
+## Saklama (Retention)
 
-RetentionManager operates independently of DB-native TTL or partitioning:
+RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çalışır:
 
-- **Active:** 24 months in `dwh_health_log`
-- **Archive:** rows older than 24 months moved to `dwh_health_log_archive`
--- **Backends:** local filesystem (default), S3, Azure Blob
+- **Aktif:** `dwh_health_log` içinde 24 ay
+- **Arşiv:** 24 aydan eski satırlar `dwh_health_log_archive`'a taşınır
+- **Backend'ler:** yerel dosya sistemi (varsayılan), S3, Azure Blob
 
 ---
 
-## Project Status
+## Proje Durumu
 
-| Phase | Description | Status |
+| Aşama | Açıklama | Durum |
 |--------|-------------|--------|
-| F0 | Infrastructure - DDL, Docker, preflight check | Done |
-| F1 | Core engine - registry, scheduler, notifier, retention | Done |
-| F2 | PostgreSQL adapter (reference implementation) | Done |
-| F3 | API layer - /health, /metrics | Done |
-| F4 | MSSQL adapter - 8 FR checks, ODBC Driver 18 | Done, awaiting credentials |
-| F5 | MySQL, MariaDB, Oracle, Generic ODBC adapters | Done, awaiting credentials |
-| F6-02 | HashiCorp Vault integration | Done |
-| F6-04 | Prometheus alert rules (6 rules) + Alertmanager | Done |
-| F6-06 | Documentation - config files, SQL schema | Done |
-| F6-01 | Kubernetes Helm chart | Planned |
-| F6-03 | Grafana dashboard JSON | Deferred |
-| F6-05 | Horizontal scaling - Redis coordination | Planned |
-| - | IBM DB2 adapter | Pending competitor analysis |
-| - | MongoDB adapter | Pending competitor analysis |
-| - | Teradata adapter | Pending competitor analysis |
+| F0 | Altyapı - DDL, Docker, ön kontrol | Bitti |
+| F1 | Çekirdek engine - registry, scheduler, notifier, retention | Bitti |
+| F2 | PostgreSQL adaptörü (referans uygulama) | Bitti |
+| F3 | API katmanı - /health, /metrics | Bitti |
+| F4 | MSSQL adaptörü - 8 FR kontrolü, ODBC Driver 18 | Bitti, kimlik bilgisi bekleniyor |
+| F5 | MySQL, MariaDB, Oracle, Genel ODBC adaptörleri | Bitti, kimlik bilgisi bekleniyor |
+| F6-02 | HashiCorp Vault entegrasyonu | Bitti |
+| F6-04 | Prometheus alarm kuralları (6 kural) + Alertmanager | Bitti |
+| F6-06 | Belgeler - yapılandırma dosyaları, SQL şeması | Bitti |
+| F6-01 | Kubernetes Helm chart | Planlandı |
+| F6-03 | Grafana panel JSON'u | Ertelendi |
+| F6-05 | Yatay ölçekleme - Redis koordinasyonu | Planlandı |
+| - | IBM DB2 adaptörü | Rakip analizi bekleniyor |
+| - | MongoDB adaptörü | Rakip analizi bekleniyor |
+| - | Teradata adaptörü | Rakip analizi bekleniyor |
 
 ---
 
-## Tech Stack
+## Teknoloji Yığını
 
-| Layer | Technology |
+| Katman | Teknoloji |
 |-------|------------|
-| API Egngine | Python 3.12, FastAPI, APScheduler |
-| Data validation | Pydantic v2 |
-| DB drivers | psycopg2, pyodbc, pymysql, python-oracledb |
-| Metrics | Prometheus, Alertmanager |
-| Secrets | HashiCorp Vault |
-| Storage | PostgreSQL 16 (partitioned) |
-| Deployment | Docker Compose (dev), Kubernetes + Helm (prod) |
+| API Engine | Python 3.12, FastAPI, APScheduler |
+| Veri doğrulama | Pydantic v2 |
+| DB sürücüleri | psycopg2, pyodbc, pymysql, python-oracledb |
+| Metrikler | Prometheus, Alertmanager |
+| Sırlar | HashiCorp Vault |
+| Depolama | PostgreSQL 16 (bölümlenmiş) |
+| Kurulum | Docker Compose (dev), Kubernetes + Helm (prod) |
