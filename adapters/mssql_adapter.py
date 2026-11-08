@@ -393,7 +393,7 @@ class MSSQLAdapter(DBAdapter):
             FROM sys.masked_columns mc
             JOIN sys.columns c ON c.object_id = mc.object_id AND c.column_id = mc.column_id
             JOIN sys.objects o ON o.object_id = mc.object_id
-            WHERE mc.is_masked = 0
+            WHERE mc.is_masked = 1
         """
         try:
             masked_rows = self._fetchall(ddm_sql)
@@ -411,27 +411,47 @@ class MSSQLAdapter(DBAdapter):
         col_rows = self._fetchall(fallback_sql)
 
         if masked_rows is not None:
+            # DDM durumu okundu: maskeli kolonlar (is_masked = 1) dışarıda bırakılır.
             masked_set = {(r[0], r[1]) for r in masked_rows}
             unmasked = [(r[0], r[1], r[2]) for r in col_rows if (r[0], r[1]) not in masked_set]
+            ddm_okunamadi = False
         else:
-            unmasked = col_rows
+            # DDM sorgusu hata verdi: maskeleme durumu bilinmiyor, sadece kolon adına
+            # göre eşleşenler listelenir ve WARNING olarak raporlanır.
+            unmasked = [(r[0], r[1], r[2]) for r in col_rows]
+            ddm_okunamadi = True
 
         if not unmasked:
             return [self._ok("FR-SEC-01", "hassas_kolon", "Maskelenmemiş hassas kolon adı yok")]
         results = []
         for row in unmasked:
-            results.append(MetricSchema(
-                db_type        = self.db_type,
-                host           = self.host,
-                db_name        = self.db_name,
-                kategori       = Kategori.GUVENLIK,
-                kontrol_kodu   = "FR-SEC-01",
-                kontrol_adi    = "hassas_kolon",
-                sonuc          = Sonuc.ERROR,
-                severity       = 3,
-                etkilenen_obje = f"{row[0]}.{row[1]}",
-                detay          = f"Tip: {row[2]} — DDM maskesi eksik",
-            ))
+            if ddm_okunamadi:
+                results.append(MetricSchema(
+                    db_type        = self.db_type,
+                    host           = self.host,
+                    db_name        = self.db_name,
+                    kategori       = Kategori.GUVENLIK,
+                    kontrol_kodu   = "FR-SEC-01",
+                    kontrol_adi    = "hassas_kolon",
+                    sonuc          = Sonuc.WARNING,
+                    severity       = 2,
+                    etkilenen_obje = f"{row[0]}.{row[1]}",
+                    detay          = f"Tip: {row[2]} — DDM durumu okunamadı (sys.masked_columns), "
+                                     f"kolon adı eşleşmesi: maskeleme doğrulanamadı",
+                ))
+            else:
+                results.append(MetricSchema(
+                    db_type        = self.db_type,
+                    host           = self.host,
+                    db_name        = self.db_name,
+                    kategori       = Kategori.GUVENLIK,
+                    kontrol_kodu   = "FR-SEC-01",
+                    kontrol_adi    = "hassas_kolon",
+                    sonuc          = Sonuc.ERROR,
+                    severity       = 3,
+                    etkilenen_obje = f"{row[0]}.{row[1]}",
+                    detay          = f"Tip: {row[2]} — DDM maskesi eksik",
+                ))
         return results
 
     def _check_offhours_queries(self) -> list[MetricSchema]:
