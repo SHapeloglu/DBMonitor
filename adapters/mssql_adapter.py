@@ -210,7 +210,8 @@ class MSSQLAdapter(DBAdapter):
     def _check_format_violations(self) -> list[MetricSchema]:
         discovery_sql = """
             SELECT TOP 20
-                TABLE_SCHEMA + '.' + TABLE_NAME AS tablo,
+                TABLE_SCHEMA,
+                TABLE_NAME,
                 COLUMN_NAME,
                 DATA_TYPE
             FROM INFORMATION_SCHEMA.COLUMNS
@@ -225,29 +226,34 @@ class MSSQLAdapter(DBAdapter):
         if not cols:
             return [self._ok("FR-DQ-04", "format_ihlali", "Format kontrol edilecek kolon bulunamadı")]
         results = []
-        for tablo, kolon, _ in cols:
+        for schema, tablo_adi, kolon, _ in cols:
+            tablo = f"{schema}.{tablo_adi}"  # yalnızca raporlama (etkilenen_obje) için
+            # Dinamik SQL'e giren adlar köşeli parantezle sarılır; içindeki ']' karakteri
+            # ']]' olarak kaçışlanır (SQL Server tanımlayıcı kuralı).
+            tablo_q = "[" + schema.replace("]", "]]") + "].[" + tablo_adi.replace("]", "]]") + "]"
+            kolon_q = "[" + kolon.replace("]", "]]") + "]"
             if "iban" in kolon.lower():
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND {kolon} NOT LIKE 'TR[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND {kolon_q} NOT LIKE 'TR[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                      AND LEN({kolon_q}) > 0
                 """
             elif any(x in kolon.lower() for x in ["tckn", "tc_kimlik"]):
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND ({kolon} NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
-                           OR LEN({kolon}) != 11)
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND ({kolon_q} NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                           OR LEN({kolon_q}) != 11)
+                      AND LEN({kolon_q}) > 0
                 """
             else:
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND {kolon} NOT LIKE '+[0-9]%'
-                      AND {kolon} NOT LIKE '0[0-9][0-9][0-9]%'
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND {kolon_q} NOT LIKE '+[0-9]%'
+                      AND {kolon_q} NOT LIKE '0[0-9][0-9][0-9]%'
+                      AND LEN({kolon_q}) > 0
                 """
             try:
                 sayi = self._fetchval(pattern_sql)
@@ -268,6 +274,18 @@ class MSSQLAdapter(DBAdapter):
                     ))
             except Exception as exc:
                 logger.warning("FR-DQ-04 tablo tarama hatası %s.%s: %s", tablo, kolon, exc)
+                results.append(MetricSchema(
+                    db_type        = self.db_type,
+                    host           = self.host,
+                    db_name        = self.db_name,
+                    kategori       = Kategori.KALITE,
+                    kontrol_kodu   = "FR-DQ-04",
+                    kontrol_adi    = "format_ihlali",
+                    sonuc          = Sonuc.WARNING,
+                    severity       = 2,
+                    etkilenen_obje = f"{tablo}.{kolon}",
+                    detay          = f"Format kontrolü çalıştırılamadı: {str(exc)[:300]}",
+                ))
         if not results:
             return [self._ok("FR-DQ-04", "format_ihlali", "Format ihlali tespit edilmedi")]
         return results
