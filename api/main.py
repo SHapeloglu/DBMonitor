@@ -2,6 +2,9 @@
 api/main.py
 ===========
 FastAPI uygulaması — /metrics, /health, /logs endpoint'leri.
+Uygulama açılırken (lifespan) ayarları okur, adapter'ları yükler ve CollectorEngine'i başlatır.
+Endpoint'ler CollectorEngine'in son sonuçlarını okur; toplama işini kendileri yapmaz (/collect hariç, o da elle tetikler).
+Çalıştırma: uvicorn api.main:app (proje kökünden).
 """
 
 from __future__ import annotations
@@ -19,12 +22,14 @@ from core.metric_schema import metrics_to_prometheus_block, summary_by_kategori
 from core.notifier import Notifier
 from core.retention_manager import RetentionManager
 
+# Tüm logger'lar için temel ayar. Bağlantı durumları ve hatalar bu seviyede konsola yazılır.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # DB config — env'den oku
 # ---------------------------------------------------------------------------
+# Log veritabanı ayarları ortam değişkenlerinden okunur. Varsayılanlar sadece yerel geliştirme içindir. DİKKAT: Kodda varsayılan bir şifre bulunur; üretimde DB_PASS mutlaka ortam değişkeniyle verilmelidir.
 DB_CONFIG = {
     "host":    os.getenv("DB_HOST", "localhost"),
     "port":    int(os.getenv("DB_PORT", "5432")),
@@ -39,13 +44,16 @@ DB_CONFIG = {
 # ---------------------------------------------------------------------------
 # Uygulama başlangıç / bitiş
 # ---------------------------------------------------------------------------
+# Uygulama açıkken dolu olan genel (global) değişken. Endpoint'ler buna bakar; None ise uygulama henüz başlamamıştır.
 engine: CollectorEngine | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """FastAPI başlangıç ve bitiş yönetimi. yield'den önce: DB ayarlarını ve yapılandırma dosyalarını okur, adapter'ları yükler ve CollectorEngine'i başlatır. yield'den sonra: zamanlayıcıyı durdurur. Uygulama açılırken ve kapanırken bir kez çalışır."""
     global engine
 
     # Registry yükle
+    # Adapter'lar config/databases.yaml'dan oluşturulur. load_all bağlantı açmaz, sadece nesneleri hazırlar.
     registry = AdapterRegistry("config/databases.yaml")
     registry.load_all()
 
@@ -59,6 +67,7 @@ async def lifespan(app: FastAPI):
         notifier       = notifier,
         retention      = retention,
         db_config      = DB_CONFIG,
+        # Toplama zamanı. Varsayılan her saat başıdır. Cron biçimi: dakika saat gün ay haftanın_günü.
         collect_cron   = os.getenv("COLLECT_CRON", "0 * * * *"),
         retention_cron = os.getenv("RETENTION_CRON", "0 1 1 * *"),
     )
@@ -67,6 +76,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Uygulama kapanırken zamanlayıcı durdurulur. Bu kod yield'den sonra, kapanış sırasında çalışır.
     engine.stop()
     logger.info("CollectorEngine durduruldu.")
 

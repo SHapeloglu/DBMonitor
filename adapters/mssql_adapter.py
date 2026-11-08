@@ -4,6 +4,8 @@ adapters/mssql_adapter.py
 Microsoft SQL Server adapter implementasyonu.
 BRD Faz 4 — FR-COST-01/03, FR-DQ-04, FR-PIPE-01/04,
              FR-USER-04, FR-SEC-01/03
+Bağlantı pyodbc ile (ODBC Driver 17 veya 18) kurulur. Kontroller sys.* DMV'lerini ve INFORMATION_SCHEMA
+görünümlerini okur. Her kontrol MetricSchema listesi döner; hata olursa _safe_collect bunu ERROR kaydına çevirir.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import logging
 import time
 from typing import Optional
 
+# TODO(kontrol): Aşağıdaki yorum 'preflight_check.py' dosyasından söz ediyor; depoda bu dosya görünmüyor. Doğrulanmalı.
 try:
     import pyodbc
 except ImportError:
@@ -35,14 +38,18 @@ HASSAS_KOLONLAR = [
 
 class MSSQLAdapter(DBAdapter):
 
+    """Microsoft SQL Server için adapter. Bağlantı pyodbc ile kurulur; kontroller sys.* DMV'lerini ve INFORMATION_SCHEMA görünümlerini okur. Her kontrol bir FR-* koduyla eşleşir."""
     ADAPTER_VERSION = "1.0.0"
 
     def __init__(self, config: dict):
+        """config: databases.yaml ayar sözlüğü. driver verilmezse bağlantı anında kurulu bir ODBC sürücüsü aranır."""
         super().__init__(config)
         self._conn: Optional[object] = None
+        # Sürücü adı databases.yaml'da verilmişse o kullanılır; verilmemişse bağlantı anında kurulu sürücü aranır.
         self._driver = config.get("driver", None)
 
     def connect(self) -> None:
+        """SQL Server'a ODBC üzerinden bağlanır. pyodbc kurulu değilse ya da uygun sürücü yoksa ConnectionError fırlatır. Giriş hatası AuthenticationError, zaman aşımı TimeoutError, diğer hatalar ConnectionError olur."""
         if pyodbc is None:
             raise ConnectionError(
                 "pyodbc yüklü değil. 'pip install pyodbc' çalıştırın.",
@@ -55,6 +62,7 @@ class MSSQLAdapter(DBAdapter):
                 db_type=self.db_type, host=self.host,
             )
         creds = self.config.get("credentials", {})
+        # Bağlantı metni. Süslü parantezler {...} sürücü adını sarar; adında boşluk olan sürücü adları için bu gereklidir.
         conn_str = (
             f"DRIVER={{{driver}}};"
             f"SERVER={self.host},{self.port or 1433};"
@@ -66,6 +74,7 @@ class MSSQLAdapter(DBAdapter):
         )
         try:
             self._conn = pyodbc.connect(conn_str, timeout=self.connect_timeout_s)
+            # pyodbc'de sorgu zaman aşımı bağlantı nesnesinin timeout alanıyla verilir (saniye).
             self._conn.timeout = self.query_timeout_s
             logger.info("MSSQL bağlantısı kuruldu: %s:%s/%s (driver=%s)",
                         self.host, self.port, self.db_name, driver)
@@ -80,6 +89,7 @@ class MSSQLAdapter(DBAdapter):
             raise ConnectionError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
 
     def disconnect(self) -> None:
+        """Bağlantıyı kapatır. Hata olursa uyarı yazar; _conn her durumda None yapılır."""
         try:
             if self._conn:
                 self._conn.close()
@@ -89,6 +99,7 @@ class MSSQLAdapter(DBAdapter):
             self._conn = None
 
     def health_check(self) -> HealthResult:
+        """SELECT 1 ile yanıt süresini ölçer. Hata olursa exception fırlatmadan is_healthy=False döner."""
         try:
             t0 = time.perf_counter()
             cur = self._conn.cursor()
@@ -101,6 +112,7 @@ class MSSQLAdapter(DBAdapter):
             return HealthResult(is_healthy=False, latency_ms=0, message=str(exc))
 
     def get_metadata(self) -> DBMetadata:
+        """SELECT @@VERSION çıktısının ilk satırını sürüm bilgisi olarak alır."""
         cur = self._conn.cursor()
         cur.execute("SELECT @@VERSION")
         version = (cur.fetchone()[0] or "").split("\n")[0].strip()
@@ -115,6 +127,7 @@ class MSSQLAdapter(DBAdapter):
         )
 
     def collect_metrics(self) -> list[MetricSchema]:
+        """Tüm kontrolleri sırayla çalıştırır. Her kontrol _safe_collect ile sarılır; biri hata verse diğerleri çalışır."""
         metrics = []
         checks = [
             (self._check_unused_tables,      "FR-COST-01"),
@@ -131,6 +144,8 @@ class MSSQLAdapter(DBAdapter):
         return metrics
 
     def _check_unused_tables(self) -> list[MetricSchema]:
+        """FR-COST-01: 30 gündür okunmamış ya da hiç okunmamış büyük tabloları bulur. Büyükten küçüğe en fazla 20 tablo listelenir."""
+        # dm_db_index_usage_stats son okuma ve tarama zamanlarını tutar. DİKKAT: Bu sayaçlar sunucu yeniden başlayınca sıfırlanır; 'hiç kullanılmadı' sonucu kesin değildir.
         sql = """
             SELECT TOP 20
                 SCHEMA_NAME(o.schema_id) + '.' + o.name AS tablo,
@@ -173,6 +188,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_unpartitioned(self) -> list[MetricSchema]:
+        """FR-COST-03: 1 GB'tan büyük ve tek partition'lı tabloları listeler."""
+        # total_pages 8 KB'lık sayfa sayısıdır: sayfa * 8 / 1024 ile MB bulunur. Tek partition'lı ve 1024 MB üzeri tablolar.
         sql = """
             SELECT TOP 10
                 SCHEMA_NAME(o.schema_id) + '.' + o.name AS tablo,
@@ -208,6 +225,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_format_violations(self) -> list[MetricSchema]:
+        """FR-DQ-04: IBAN, TCKN ve telefon benzeri kolonlarda biçime uymayan kayıtları sayar. Önce bu kolonlar bulunur, sonra her biri için kendi biçim kuralı uygulanır. Sayı 1000'i aşarsa önem derecesi 3 olur."""
+        # İki aşamalı kontrol: önce ilgili kolonlar bulunur, sonra sadece onlar için biçim sorgusu çalıştırılır.
         discovery_sql = """
             SELECT TOP 20
                 TABLE_SCHEMA + '.' + TABLE_NAME AS tablo,
@@ -227,6 +246,7 @@ class MSSQLAdapter(DBAdapter):
         results = []
         for tablo, kolon, _ in cols:
             if "iban" in kolon.lower():
+                # DİKKAT: Tablo ve kolon adları metadata'dan alınıp köşeli parantez içine alınmadan yazılır. Boşluk ya da özel karakter içeren adlarda sorgu hata verir ve o kolon atlanır.
                 pattern_sql = f"""
                     SELECT COUNT(*) FROM {tablo}
                     WHERE {kolon} IS NOT NULL
@@ -249,6 +269,7 @@ class MSSQLAdapter(DBAdapter):
                       AND {kolon} NOT LIKE '0[0-9][0-9][0-9]%'
                       AND LEN({kolon}) > 0
                 """
+            # Bir kolonun taraması hata verirse (yetki, veri tipi vb.) sadece uyarı yazılır; diğer kolonlar taranmaya devam eder.
             try:
                 sayi = self._fetchval(pattern_sql)
                 if sayi and sayi > 0:
@@ -273,6 +294,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_daily_load(self) -> list[MetricSchema]:
+        """FR-PIPE-01: 10.000'den fazla satırı olan ama bugün DML (INSERT, UPDATE, DELETE) almamış tabloları bulur."""
+        # last_user_update son kullanıcı güncellemesinin zamanıdır. Bugünden eski ya da hiç yoksa tablo bugün işlenmemiş sayılır.
         sql = """
             SELECT TOP 10
                 SCHEMA_NAME(o.schema_id) + '.' + o.name AS tablo,
@@ -316,6 +339,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_schema_changes(self) -> list[MetricSchema]:
+        """FR-PIPE-04: Son 24 saatte oluşturulan veya değiştirilen tablo, view ve prosedürleri listeler."""
+        # modify_date nesnenin son değiştirilme zamanıdır (CREATE veya ALTER).
         sql = """
             SELECT TOP 20
                 SCHEMA_NAME(o.schema_id) + '.' + o.name AS obje,
@@ -348,6 +373,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_large_queries(self) -> list[MetricSchema]:
+        """FR-USER-04: Ortalama çalışma süresi 5 saniyeyi aşan sorguları (önbellek istatistiklerine göre) bulur. Ortalama 30 saniyeyi aşarsa önem derecesi 3 olur."""
+        # total_elapsed_time mikro saniye cinsindendir; /1000 ile milisaniyeye çevrilir. 5000 ms = 5 saniye.
         sql = """
             SELECT TOP 10
                 qs.total_elapsed_time / qs.execution_count / 1000 AS ort_sure_ms,
@@ -385,6 +412,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_sensitive_columns(self) -> list[MetricSchema]:
+        """FR-SEC-01: Hassas adlı kolonlardan Dynamic Data Masking (DDM) ile maskelenmemiş olanları bulur. DDM bilgisi okunamazsa hassas adlı tüm kolonlar raporlanır."""
+        # TODO(kontrol): Bu sorgu 'is_masked = 0' filtresiyle çalışıyor. sys.masked_columns görünümünde is_masked değeri 1 olan kolonlar maskelidir; filtre bu nedenle ters çalışıyor olabilir ve sonuçta tüm hassas kolonlar 'maskesiz' görünebilir. Doğrulanmalı.
         ddm_sql = """
             SELECT
                 SCHEMA_NAME(o.schema_id) + '.' + o.name AS tablo,
@@ -400,6 +429,7 @@ class MSSQLAdapter(DBAdapter):
         except Exception:
             masked_rows = None
 
+        # Hassas adlı tüm kolonlar önce ada göre bulunur; sonra DDM bilgisiyle karşılaştırılır. Liste sabittir (HASSAS_KOLONLAR), kullanıcı girdisi değildir.
         fallback_sql = f"""
             SELECT
                 TABLE_SCHEMA + '.' + TABLE_NAME AS tablo,
@@ -435,6 +465,8 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _check_offhours_queries(self) -> list[MetricSchema]:
+        """FR-SEC-03: Mesai dışı saatlerde (07:00 öncesi veya 20:00 sonrası) çalışan ve 1 milyondan fazla mantıksal okuma yapan kullanıcı sorgularını bulur."""
+        # 07:00 öncesi ve 20:00 sonrası 'mesai dışı' sayılır. Sadece kullanıcı oturumları (is_user_process = 1) alınır.
         sql = """
             SELECT TOP 10
                 r.session_id,
@@ -454,6 +486,7 @@ class MSSQLAdapter(DBAdapter):
                 AND s.is_user_process = 1
             ORDER BY r.logical_reads DESC
         """
+        # DİKKAT: Yetki yoksa kontrol hata vermeden OK döner. Bu, kontrolün yapılamadığı anlamına gelir; OK sonucu yanıltıcı olabilir.
         try:
             rows = self._fetchall(sql)
         except Exception:
@@ -477,6 +510,7 @@ class MSSQLAdapter(DBAdapter):
         return results
 
     def _fetchall(self, sql: str) -> list:
+        """SQL'i çalıştırıp tüm satırları döner. İmleç (cursor) iş bitince kapatılır."""
         cur = self._conn.cursor()
         cur.execute(sql)
         rows = cur.fetchall()
@@ -484,6 +518,7 @@ class MSSQLAdapter(DBAdapter):
         return rows
 
     def _fetchval(self, sql: str):
+        """SQL'i çalıştırıp ilk satırın ilk değerini döner. Sonuç yoksa None döner."""
         cur = self._conn.cursor()
         cur.execute(sql)
         row = cur.fetchone()
@@ -491,6 +526,7 @@ class MSSQLAdapter(DBAdapter):
         return row[0] if row else None
 
     def _ok(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Bir kontrolün sorunsuz olduğunu gösteren OK kaydı üretir. OK kaydında severity her zaman 1 olmalıdır."""
         return MetricSchema(
             db_type      = self.db_type,
             host         = self.host,
@@ -505,9 +541,11 @@ class MSSQLAdapter(DBAdapter):
 
     @staticmethod
     def _detect_driver() -> Optional[str]:
+        """Kurulu ODBC sürücülerinden SQL Server için uygun olanı seçer: önce Driver 18, sonra Driver 17, yoksa adında 'SQL Server' geçen ilk sürücü. Hiçbiri yoksa None döner."""
         if pyodbc is None:
             return None
         drivers = pyodbc.drivers()
+        # Önce en yeni sürücü (18), sonra 17 denenir.
         for preferred in ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server"]:
             if preferred in drivers:
                 return preferred
