@@ -363,8 +363,11 @@ class MSSQLAdapter(DBAdapter):
         """
         try:
             rows = self._fetchall(sql)
-        except Exception:
-            return [self._ok("FR-USER-04", "buyuk_sorgu", "sys.dm_exec_query_stats erişim yetkisi yok — atlandı")]
+        except Exception as exc:
+            if self._is_permission_error(exc):
+                return [self._skipped_warning("FR-USER-04", "buyuk_sorgu",
+                                              "sys.dm_exec_query_stats erişim yetkisi yok — kontrol atlandı")]
+            raise
         if not rows:
             return [self._ok("FR-USER-04", "buyuk_sorgu", "5s+ ortalama süreli sorgu yok")]
         results = []
@@ -476,8 +479,11 @@ class MSSQLAdapter(DBAdapter):
         """
         try:
             rows = self._fetchall(sql)
-        except Exception:
-            return [self._ok("FR-SEC-03", "mesai_disi_sorgu", "sys.dm_exec_requests erişim yetkisi yok — atlandı")]
+        except Exception as exc:
+            if self._is_permission_error(exc):
+                return [self._skipped_warning("FR-SEC-03", "mesai_disi_sorgu",
+                                              "sys.dm_exec_requests erişim yetkisi yok — kontrol atlandı")]
+            raise
         if not rows:
             return [self._ok("FR-SEC-03", "mesai_disi_sorgu", "Mesai dışı büyük sorgu tespit edilmedi")]
         results = []
@@ -522,6 +528,32 @@ class MSSQLAdapter(DBAdapter):
             severity     = 1,
             detay        = detay,
         )
+
+    def _skipped_warning(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Yetki eksikliyle atlanan kontrol: OK değil, WARNING."""
+        return MetricSchema(
+            db_type      = self.db_type,
+            host         = self.host,
+            db_name      = self.db_name,
+            kategori     = self._kategori_from_kod(kod),
+            kontrol_kodu = kod,
+            kontrol_adi  = ad,
+            sonuc        = Sonuc.WARNING,
+            severity     = 2,
+            detay        = detay,
+        )
+
+    @staticmethod
+    def _is_permission_error(exc: Exception) -> bool:
+        """SQL Server yetki hatası mı? (SQLSTATE 42000 + 'permission' metni,
+        veya VIEW SERVER STATE izni eksikliği.) Diğer hatalar False döner."""
+        if pyodbc is None or not isinstance(exc, pyodbc.Error):
+            return False
+        msg = str(exc).lower()
+        if "view server state" in msg:
+            return True
+        sqlstate = str(exc.args[0]) if exc.args else ""
+        return sqlstate == "42000" and "permission" in msg
 
     @staticmethod
     def _detect_driver() -> Optional[str]:
