@@ -72,44 +72,6 @@ Production'da şifreler düz text'te, Git repo'ya push olabiliyor.
 
 ---
 
-## Oturum 12 — F6-04 Prometheus Alert Rules (2026-08-14)
-
-### Yapılanlar
-1. prometheus-rules.yml — 6 alert rule grup
-   - DWHCriticalHealthIssue (5m)
-   - DWHSecurityThreat (1m)
-   - DWHPipelineBreakdown (10m)
-   - DWHWarningIssue (15m)
-   - DWHMultipleCategoriesCritical (10m)
-   - DWHAllAdaptersDown (5m)
-
-2. alertmanager-config.yml — Webhook receiver
-   - default-receiver: generic handling
-   - Slack config (routes'ta aktivasyon bekleniyor)
-   - inhibit_rules: critical → warning bastırma
-
-3. docker-compose.yml — Prometheus + Alertmanager services
-4. prometheus.yml — scrape config (dwh-monitor:8005 scraping)
-
-### Test Results
-- Prometheus: http://localhost:9090 UP
-- Alertmanager: http://localhost:9093 UP
-- Targets: dwh-metrics UP (8 metrics scraping)
-- Metrics: postgresql adapter 8 kontrol, tüm OK
-- Alerts: 0 (tüm kontrol'ler başarılı)
-
-### Issues & Resolutions
-- Vault dev-mode: restart'ta data kayboldu → credentials plain text YAML'a taşındı
-- Prometheus scrape: localhost → container name (dwh-monitor:8005)
-- Alert test: manuel test alert eklendi ama adapter kontrol'lerine ağırlık yok
-
-### Next Steps
-1. Slack webhook URL ayarla (alertmanager.yml'de)
-2. F6-06 — Dokümantasyon
-3. Production Vault setup (sealed mode)
-
----
-
 ## Oturum 11 — F6-06 Dokümantasyon Tamamlandı
 
 ### Yapılanlar

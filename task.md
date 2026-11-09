@@ -10,7 +10,6 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 |---|---|---|---|
 | F0-01 | ✅ `preflight_check.py` | 🔴 Bloker | Tamamlandı |
 | F0-02 | ✅ `dwh_health_log` DDL | 🔴 Bloker | PostgreSQL 16, monitor schema, 24 aylık partition |
-| F0-03 | ⬜ Secrets yönetimi (Vault entegrasyonu) | Orta | Şu an düz text, K-02 kararı bekliyor |
 | F0-04 | ✅ `docker-compose.yml` | Yüksek | dq-postgres + dwh-monitor, port 8005 |
 | F0-05 | ⬜ CI pipeline — lint + test + docker build | Orta | GitHub Actions önerilir |
 
@@ -25,7 +24,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F1-03 | ✅ `AdapterRegistry` — YAML + importlib | `core/adapter_registry.py` | Tamamlandı |
 | F1-04 | ✅ `CollectorEngine` — APScheduler + circuit breaker | `core/collector_engine.py` | Tamamlandı. K-01 → APScheduler seçildi |
 | F1-05 | ✅ `Notifier` — SMTP + Slack + PagerDuty + Teams | `core/notifier.py` | Tamamlandı, 3 kural yüklü |
-| F1-06 | ✅ `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Tamamlandı |
+| F1-06 | 🔄 `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Kısmi: yalnızca yerel arşiv. S3/Azure export stub (`core/retention_manager.py:257-273`), K-06 açık |
 
 ---
 
@@ -47,8 +46,8 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F3-02 | ✅ `GET /health` | Tamamlandı |
 | F3-03 | ✅ `GET /metrics` — Prometheus format | Tamamlandı, doğrulandı |
 | F3-04 | ⬜ `GET /logs` — JSON filtreli | Yapılmadı |
-| F3-05 | ⬜ `GET /logs/summary` | Yapılmadı |
-| F3-06 | ⬜ `GET /adapters` | Yapılmadı |
+| F3-05 | ✅ `GET /logs/summary` | Tamamlandı (`api/main.py:118`) |
+| F3-06 | ✅ `GET /adapters` | Tamamlandı (`api/main.py:127`) |
 | F3-07 | ⬜ API auth — Bearer / API key | Yapılmadı. K-07 kararı bekliyor |
 
 ---
@@ -84,7 +83,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | # | Görev | Öncelik | Durum |
 |---|---|---|---|
 | F6-01 | Kubernetes Helm chart | Yüksek | ⬜ Yapılmadı |
-| F6-02 | ✅ Secrets yönetimi — Vault | Yüksek | ✅ Tamamlandı (dev mode + plain text fallback) |
+| F6-02 | ✅ Secrets yönetimi — Vault | Yüksek | ✅ Tamamlandı (dev mode + plain text fallback). Not: dev modunda tamamlandı; prod kurulumu ve düz metin kaldırma K-02'de açık. F0-03 ile birleştirildi (tekrar eden satır). |
 | F6-03 | Grafana dashboard JSON | Orta | ⬜ Deferred |
 | F6-04 | ✅ Prometheus alert rules | Orta | ✅ Tamamlandı (6 alert rule, Alertmanager UP) |
 | F6-05 | Horizontal scaling — Redis koordinasyon | Düşük | ⬜ Yapılmadı |
@@ -118,7 +117,7 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 1. **Helm chart (F6-01)** veya **Rakip analizi** — hangisi öncelikli?
 2. Rakip analizine göre DB2 / MongoDB / Teradata önceliklerini belirle
 3. Gerçek MSSQL/Oracle/MySQL bağlantı bilgileri gelince adapter'ları aktif et
-4. F3-04/05/06 — API log endpoint'leri
+4. F3-04 — `GET /logs` (JSON filtreli). F3-05/06 tamamlandı.
 5. F6 — Production hazırlık (kalan görevler)
 
 ---
