@@ -87,6 +87,9 @@ class FakeEngine:
     def get_circuit_status(self):
         return {}
 
+    def get_last_metrics(self):
+        return []
+
 
 @pytest.fixture(autouse=True)
 def _no_api_key_env(monkeypatch):
@@ -226,3 +229,53 @@ def test_logs_naive_datetime_is_treated_as_utc(client, fake_engine):
     assert resp.status_code == 200
     _, params = fake_engine.conn.executed[-1]
     assert params[0] == datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# API anahtarı (F3-07)
+# ---------------------------------------------------------------------------
+
+API_KEY = "test-anahtar-7c1e"
+PROTECTED = ["/metrics", "/collect", "/logs/summary", "/adapters", "/logs"]
+
+
+def test_auth_disabled_when_api_key_unset(client, fake_engine):
+    assert client.get("/adapters").status_code == 200
+    assert client.get("/logs").status_code == 200
+
+
+def test_auth_disabled_when_api_key_empty(client, fake_engine, monkeypatch):
+    monkeypatch.setenv("API_KEY", "")
+    assert client.get("/adapters").status_code == 200
+    assert client.get("/adapters", headers={"X-API-Key": "rastgele"}).status_code == 200
+
+
+def test_auth_enabled_rejects_missing_key(client, fake_engine, monkeypatch):
+    monkeypatch.setenv("API_KEY", API_KEY)
+    for path in PROTECTED:
+        resp = client.get(path)
+        assert resp.status_code == 401, path
+
+
+def test_auth_enabled_rejects_wrong_key_without_echo(client, fake_engine, monkeypatch):
+    monkeypatch.setenv("API_KEY", API_KEY)
+    wrong = "yanlis-anahtar"
+    for path in PROTECTED:
+        resp = client.get(path, headers={"X-API-Key": wrong})
+        assert resp.status_code == 401, path
+        assert wrong not in resp.text
+        assert API_KEY not in resp.text
+
+
+def test_auth_enabled_accepts_correct_key(client, fake_engine, monkeypatch):
+    monkeypatch.setenv("API_KEY", API_KEY)
+    headers = {"X-API-Key": API_KEY}
+    assert client.get("/adapters", headers=headers).status_code == 200
+    assert client.get("/logs", headers=headers).status_code == 200
+    assert client.get("/logs/summary", headers=headers).status_code == 200
+
+
+def test_health_open_when_auth_enabled(client, monkeypatch):
+    monkeypatch.setenv("API_KEY", API_KEY)
+    resp = client.get("/health")
+    assert resp.status_code == 200

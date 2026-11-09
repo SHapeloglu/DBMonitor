@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Literal, Optional
 
 import psycopg2
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from core.adapter_registry import AdapterRegistry
@@ -22,6 +22,7 @@ from core.collector_engine import CollectorEngine
 from core.metric_schema import metrics_to_prometheus_block, summary_by_kategori
 from core.notifier import Notifier
 from core.retention_manager import RetentionManager
+from api.auth import log_auth_mode, require_api_key
 from api.logs import LogPage, LogItem, fetch_logs, to_utc
 
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +50,8 @@ engine: CollectorEngine | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global engine
+
+    log_auth_mode()
 
     # Registry yükle
     registry = AdapterRegistry("config/databases.yaml")
@@ -99,7 +102,7 @@ def health():
     }
 
 
-@app.get("/metrics", response_class=PlainTextResponse)
+@app.get("/metrics", response_class=PlainTextResponse, dependencies=[Depends(require_api_key)])
 def metrics():
     """Prometheus exposition format — Grafana / Prometheus scrape eder."""
     if engine is None:
@@ -108,7 +111,7 @@ def metrics():
     return metrics_to_prometheus_block(last)
 
 
-@app.get("/collect")
+@app.get("/collect", dependencies=[Depends(require_api_key)])
 def collect_now():
     """Manuel koleksiyon tetikle — test ve preflight için."""
     if engine is None:
@@ -120,7 +123,7 @@ def collect_now():
     }
 
 
-@app.get("/logs/summary")
+@app.get("/logs/summary", dependencies=[Depends(require_api_key)])
 def logs_summary():
     """Son koleksiyonun kategori bazlı özeti."""
     if engine is None:
@@ -132,7 +135,7 @@ def logs_summary():
 DB_UNAVAILABLE_DETAIL = "Veritabanı şu anda kullanılamıyor"
 
 
-@app.get("/logs", response_model=LogPage)
+@app.get("/logs", response_model=LogPage, dependencies=[Depends(require_api_key)])
 def logs(
     db_name:      Optional[str]      = Query(None, min_length=1, max_length=255),
     kontrol_kodu: Optional[str]      = Query(None, min_length=1, max_length=30),
@@ -171,7 +174,7 @@ def logs(
     return LogPage(items=items, limit=limit, offset=offset, count=len(items))
 
 
-@app.get("/adapters")
+@app.get("/adapters", dependencies=[Depends(require_api_key)])
 def adapters():
     """Kayıtlı adapter'lar ve circuit breaker durumları."""
     if engine is None:
