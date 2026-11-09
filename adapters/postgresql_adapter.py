@@ -1,7 +1,10 @@
 """
 adapters/postgresql_adapter.py
 ==============================
-PostgreSQL referans adapter implementasyonu.
+PostgreSQL için referans adapter implementasyonu. Diğer adapter'lar bu dosyanın yapısını örnek alabilir:
+bağlan, bağlantıyı kapat, sağlık kontrolü yap, metadata al ve kontrolleri çalıştır.
+Kontroller pg_stat_* ve information_schema görünümlerini okur; veriye dokunmaz.
+Sonuçlar core/metric_schema.MetricSchema olarak döner ve core/collector_engine tarafından işlenir.
 """
 
 from __future__ import annotations
@@ -24,13 +27,16 @@ logger = logging.getLogger(__name__)
 
 class PostgreSQLAdapter(DBAdapter):
 
+    """PostgreSQL için referans adapter. Diğer adapter'lar bu dosyanın yapısını örnek alabilir: bağlan, sağlık kontrolü, metadata ve kontrol metotları. Kontroller pg_stat_* ve information_schema görünümlerini okur."""
     ADAPTER_VERSION = "1.0.0"
 
     def __init__(self, config: dict):
+        """config: databases.yaml'daki bu veritabanının ayar sözlüğü. Bağlantı nesnesi başta None'dır; connect() çağrılınca dolar."""
         super().__init__(config)
         self._conn: Optional[object] = None
 
     def connect(self) -> None:
+        """PostgreSQL'e bağlanır. Sunucu tarafında sorgu zaman aşımı (statement_timeout) da ayarlanır. Şifre veya yetki hatası AuthenticationError, zaman aşımı TimeoutError, diğer hatalar ConnectionError olarak fırlatılır."""
         creds = self.config.get("credentials", {})
         try:
             self._conn = psycopg2.connect(
@@ -40,11 +46,14 @@ class PostgreSQLAdapter(DBAdapter):
                 user            = creds.get("user", ""),
                 password        = creds.get("password", ""),
                 connect_timeout = self.connect_timeout_s,
+                # Sunucu tarafında her sorguya zaman sınırı koyar (milisaniye cinsinden). Uygulama takılsa bile veritabanı sorguyu kendisi iptal eder.
                 options         = f"-c statement_timeout={self.query_timeout_s * 1000}",
             )
+            # Monitör sadece okuma yaptığı için her sorgu hemen tamamlanır; elle işlem (transaction) yönetmeye gerek yoktur.
             self._conn.autocommit = True
             logger.info("PostgreSQL bağlantısı kuruldu: %s:%s/%s", self.host, self.port, self.db_name)
         except psycopg2.OperationalError as exc:
+            # Hata metnine bakarak türünü ayırırız: şifre hatası kimlik doğrulama, timeout zaman aşımı, diğerleri genel bağlantı hatasıdır.
             msg = str(exc).lower()
             if "password" in msg or "authentication" in msg:
                 raise AuthenticationError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
@@ -55,6 +64,7 @@ class PostgreSQLAdapter(DBAdapter):
             raise ConnectionError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
 
     def disconnect(self) -> None:
+        """Bağlantıyı kapatır. Kapatma sırasında hata olursa sadece uyarı yazılır; _conn her durumda None yapılır."""
         try:
             if self._conn and not self._conn.closed:
                 self._conn.close()
@@ -64,6 +74,7 @@ class PostgreSQLAdapter(DBAdapter):
             self._conn = None
 
     def health_check(self) -> HealthResult:
+        """SELECT 1 sorgusunu çalıştırıp süresini ölçer. Hata olursa exception fırlatmaz, is_healthy=False olan bir HealthResult döner."""
         try:
             t0 = time.perf_counter()
             with self._conn.cursor() as cur:
@@ -75,6 +86,7 @@ class PostgreSQLAdapter(DBAdapter):
             return HealthResult(is_healthy=False, latency_ms=0, message=str(exc))
 
     def get_metadata(self) -> DBMetadata:
+        """PostgreSQL sürümünü (SELECT version()) alıp DBMetadata olarak döner."""
         with self._conn.cursor() as cur:
             cur.execute("SELECT version()")
             version = cur.fetchone()[0]
@@ -88,6 +100,7 @@ class PostgreSQLAdapter(DBAdapter):
         )
 
     def collect_metrics(self) -> list[MetricSchema]:
+        """Tüm kontrolleri sırayla çalıştırır. Her kontrol _safe_collect ile sarılır: biri hata verse bile diğerleri çalışmaya devam eder."""
         metrics = []
         checks = [
             (self._check_unused_tables,     "FR-COST-01"),
@@ -107,6 +120,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-COST-01: Kullanılmayan tablolar
     # ------------------------------------------------------------------
     def _check_unused_tables(self) -> list[MetricSchema]:
+        """FR-COST-01: 30 gündür okunmamış (seq ve idx scan yok) kullanıcı tablolarını bulur. Büyükten küçüğe en fazla 20 tablo listelenir. Sonuç yoksa tek bir OK kaydı döner."""
+        # Son erişimi 30 günden eski veya hiç erişilmemiş tablolar. DİKKAT: pg_stat_* sayaçları sunucu yeniden başlayınca sıfırlanabilir.
         sql = """
             SELECT
                 schemaname || '.' || relname AS tablo,
@@ -149,6 +164,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-COST-02: Tablo bloat
     # ------------------------------------------------------------------
     def _check_table_bloat(self) -> list[MetricSchema]:
+        """FR-COST-02: Ölü satır (dead tuple) oranı %20'yi aşan ve en az 1000 ölü satırı olan tabloları bulur. Ölü satır çoksa VACUUM yetersiz demektir. Oran %40'ı aşarsa önem derecesi 3 olur."""
+        # Ölü satır oranı yüksek tablolar. Ölü satır birikirse VACUUM çalışmamış ya da yetersiz demektir.
         sql = """
             SELECT
                 schemaname || '.' || relname AS tablo,
@@ -194,6 +211,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-COST-03: Partitionsiz büyük tablolar
     # ------------------------------------------------------------------
     def _check_unpartitioned(self) -> list[MetricSchema]:
+        """FR-COST-03: 1 GB'tan büyük ve partition edilmemiş tabloları listeler. Partition, büyük tabloyu parçalara bölerek sorgu ve bakımı hızlandırır."""
+        # 1 GB (1073741824 bayt) üzeri ve partition edilmemiş tablolar.
         sql = """
             SELECT
                 s.schemaname || '.' || s.relname AS tablo,
@@ -239,6 +258,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-DQ-01: NULL oranı yüksek kolonlar
     # ------------------------------------------------------------------
     def _check_null_ratio(self) -> list[MetricSchema]:
+        """FR-DQ-01: pg_stats içinden NULL oranı yarıdan fazla olan kolonları bulur. pg_stats'a erişim yoksa kontrol hata vermeden atlanır ve OK döner."""
+        # pg_stats NULL oranı ANALYZE ile tahmin edilen bir değerdir; kesin sayı değildir.
         sql = """
             SELECT
                 schemaname || '.' || tablename AS tablo,
@@ -283,6 +304,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-DQ-02: PK/UNIQUE kısıt eksik tablolar
     # ------------------------------------------------------------------
     def _check_duplicates(self) -> list[MetricSchema]:
+        """FR-DQ-02: PK veya UNIQUE kısıtı olmayan, kayıt içeren tabloları bulur. Kontrol adı tekrar kaydı arar gibi görünse de gerçekte sadece kısıt eksikliğine bakar."""
+        # DİKKAT: Kontrol adı tekrar kayıtlarını arar gibi görünür ama bu sorgu PK/UNIQUE kısıtı eksik tabloları bulur. contype 'p' primary key, 'u' unique anlamına gelir.
         sql = """
             SELECT
                 s.schemaname || '.' || s.relname AS tablo,
@@ -330,6 +353,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-PIPE-01: Bugün veri gelmeyen tablolar
     # ------------------------------------------------------------------
     def _check_daily_load(self) -> list[MetricSchema]:
+        """FR-PIPE-01: 10.000'den fazla satırı olan ama son bir gündür hiç INSERT almamış tabloları bulur. Veri yükleme işinin durduğunu gösterebilir."""
+        # Büyük ama son bir gündür INSERT almamış tablolar. n_tup_ins istatistiği sayaç olduğu için sıfırlanmalara karşı dikkatli yorumlanmalıdır.
         sql = """
             SELECT
                 schemaname || '.' || relname AS tablo,
@@ -371,8 +396,10 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-SEC-01: Maskelenmemiş hassas kolon adları
     # ------------------------------------------------------------------
     def _check_sensitive_columns(self) -> list[MetricSchema]:
+        """FR-SEC-01: Adı hassas veri gibi görünen kolonları (parola, kart no, TCKN, IBAN vb.) bulur. Sadece kolon adına bakar; veri içeriğini okumaz."""
         HASSAS = ["password","parola","sifre","passwd","credit_card","kredi_kart",
                   "kart_no","ssn","tc_kimlik","tckn","iban","banka","token","secret","api_key"]
+        # Kolon adına bakılır; içerik taranmaz. Bu yüzden sadece bir ipucudur, kesin hassas veri kanıtı değildir.
         sql = """
             SELECT
                 table_schema || '.' || table_name AS tablo,
@@ -412,6 +439,8 @@ class PostgreSQLAdapter(DBAdapter):
     # FR-USER-01: Uzun süren sorgular
     # ------------------------------------------------------------------
     def _check_long_queries(self) -> list[MetricSchema]:
+        """FR-USER-01: pg_stat_activity üzerinden 60 saniyeden uzun süredir çalışan aktif sorguları bulur. En fazla 10 kayıt döner. Monitörün kendi sorguları hariç tutulur."""
+        # 60 saniyeden uzun süren aktif sorgular. Bu sınırı aşan sorgular önem derecesi 3 (kritik) olarak raporlanır (300 sn).
         sql = """
             SELECT
                 pid,
@@ -455,6 +484,7 @@ class PostgreSQLAdapter(DBAdapter):
     # Yardımcı
     # ------------------------------------------------------------------
     def _ok(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Bir kontrolün sorunsuz olduğunu gösteren OK kaydı üretir. OK kaydında severity her zaman 1 olmalıdır (MetricSchema kuralı)."""
         return MetricSchema(
             db_type      = self.db_type,
             host         = self.host,
