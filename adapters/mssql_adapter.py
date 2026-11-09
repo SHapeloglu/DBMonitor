@@ -437,8 +437,8 @@ class MSSQLAdapter(DBAdapter):
             unmasked = [(r[0], r[1], r[2]) for r in col_rows if (r[0], r[1]) not in masked_set]
             ddm_okunamadi = False
         else:
-            # DDM sorgusu hata verdi: maskeleme durumu bilinmiyor, sadece kolon adına
-            # göre eşleşenler listelenir ve WARNING olarak raporlanır.
+            # DDM sorgusu hata verdi: maskeleme durumu bilinmiyor. Güvenlik kontrolü
+            # doğrulanamayan durumu geçmiş saymaz; kolon adı eşleşenler ERROR olarak raporlanır.
             unmasked = [(r[0], r[1], r[2]) for r in col_rows]
             ddm_okunamadi = True
 
@@ -447,32 +447,22 @@ class MSSQLAdapter(DBAdapter):
         results = []
         for row in unmasked:
             if ddm_okunamadi:
-                results.append(MetricSchema(
-                    db_type        = self.db_type,
-                    host           = self.host,
-                    db_name        = self.db_name,
-                    kategori       = Kategori.GUVENLIK,
-                    kontrol_kodu   = "FR-SEC-01",
-                    kontrol_adi    = "hassas_kolon",
-                    sonuc          = Sonuc.WARNING,
-                    severity       = 2,
-                    etkilenen_obje = f"{row[0]}.{row[1]}",
-                    detay          = f"Tip: {row[2]} — DDM durumu okunamadı (sys.masked_columns), "
-                                     f"kolon adı eşleşmesi: maskeleme doğrulanamadı",
-                ))
+                detay = (f"Tip: {row[2]} — DDM durumu okunamadı (sys.masked_columns); "
+                         f"maskeleme doğrulanamadı, kolon maskesiz olabilir")
             else:
-                results.append(MetricSchema(
-                    db_type        = self.db_type,
-                    host           = self.host,
-                    db_name        = self.db_name,
-                    kategori       = Kategori.GUVENLIK,
-                    kontrol_kodu   = "FR-SEC-01",
-                    kontrol_adi    = "hassas_kolon",
-                    sonuc          = Sonuc.ERROR,
-                    severity       = 3,
-                    etkilenen_obje = f"{row[0]}.{row[1]}",
-                    detay          = f"Tip: {row[2]} — DDM maskesi eksik",
-                ))
+                detay = f"Tip: {row[2]} — DDM maskesi eksik"
+            results.append(MetricSchema(
+                db_type        = self.db_type,
+                host           = self.host,
+                db_name        = self.db_name,
+                kategori       = Kategori.GUVENLIK,
+                kontrol_kodu   = "FR-SEC-01",
+                kontrol_adi    = "hassas_kolon",
+                sonuc          = Sonuc.ERROR,
+                severity       = 3,
+                etkilenen_obje = f"{row[0]}.{row[1]}",
+                detay          = detay,
+            ))
         return results
 
     def _check_offhours_queries(self) -> list[MetricSchema]:
@@ -567,11 +557,10 @@ class MSSQLAdapter(DBAdapter):
         veya VIEW SERVER STATE izni eksikliği.) Diğer hatalar False döner."""
         if pyodbc is None or not isinstance(exc, pyodbc.Error):
             return False
-        msg = str(exc).lower()
-        if "view server state" in msg:
-            return True
-        sqlstate = str(exc.args[0]) if exc.args else ""
-        return sqlstate == "42000" and "permission" in msg
+        # Hata numarası dil bağımsızdır (metin İngilizce olmayan sunucularda değişir):
+        # 229 = SELECT izni yok, 297 = VIEW SERVER STATE / izin yok.
+        msg = str(exc)
+        return any(f"({num})" in msg for num in ("229", "297"))
 
     @staticmethod
     def _detect_driver() -> Optional[str]:
