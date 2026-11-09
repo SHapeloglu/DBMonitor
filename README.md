@@ -161,7 +161,7 @@ databases:
     query_timeout_s: 30
     enabled: true
     credentials:
-      user: dquser
+      user: apache
       password: dqpass          # veya: vault://secret/dwh/postgresql
 
   - name: prod-mssql

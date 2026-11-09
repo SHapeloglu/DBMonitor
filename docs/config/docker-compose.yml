@@ -18,7 +18,7 @@ services:
     image: postgres:16
     container_name: dq-postgres
     environment:
-      POSTGRES_USER: dquser
+      POSTGRES_USER: apache
       POSTGRES_PASSWORD: dqpass
       POSTGRES_DB: dqmetrics
     volumes:
@@ -29,7 +29,7 @@ services:
     networks:
       - dwh-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dquser -d dqmetrics"]
+      test: ["CMD-SHELL", "pg_isready -U apache -d dqmetrics"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=dwhmonitor
-      - DB_USER=dquser
+      - DB_USER=apache
       - DB_PASS=dqpass
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_TOKEN}
