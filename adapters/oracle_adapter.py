@@ -17,6 +17,7 @@ import logging
 import time
 from typing import Optional
 
+# TODO(kontrol): Aşağıdaki yorum 'preflight_check.py' dosyasından söz ediyor; depoda bu dosya görünmüyor. Doğrulanmalı.
 try:
     import oracledb
 except ImportError:
@@ -38,20 +39,24 @@ HASSAS_KOLONLAR = [
 ]
 
 # Oracle sistem schema'ları — tarama dışı
+# Oracle'ın kendi sistem kullanıcıları (SYS, SYSTEM vb.). Kontroller bunları taramaz; yoksa Oracle'ın iç tabloları da raporlanır.
 SISTEM_SCHEMAS = (
     "'SYS'", "'SYSTEM'", "'DBSNMP'", "'SYSMAN'", "'OUTLN'",
     "'MDSYS'", "'ORDSYS'", "'EXFSYS'", "'DMSYS'", "'WMSYS'",
     "'CTXSYS'", "'ANONYMOUS'", "'XDB'", "'XS$NULL'",
     "'APEX_PUBLIC_USER'", "'SPATIAL_CSW_ADMIN_USR'",
 )
+# Demet (tuple) SQL'deki IN (...) listesine çevrilir. Tek tırnaklar SQL metninde zorunludur.
 SISTEM_SCHEMAS_SQL = ", ".join(SISTEM_SCHEMAS)
 
 
 class OracleAdapter(DBAdapter):
 
+    """Oracle Database için adapter. python-oracledb ile Thin modda bağlanır, yani Oracle Client kurulumu gerekmez. Kontroller V$, DBA_* ve ALL_* görünümlerini okur; Diagnostics Pack lisansı gerektirmez."""
     ADAPTER_VERSION = "1.0.0"
 
     def __init__(self, config: dict):
+        """config: databases.yaml ayarı. service_name verilmezse db_name, Oracle servis adı olarak kullanılır."""
         super().__init__(config)
         self._conn: Optional[object] = None
         # Oracle'da db_name yerine service_name kullanılabilir
@@ -61,6 +66,7 @@ class OracleAdapter(DBAdapter):
     # Bağlantı — Thin mode (Oracle Client gerekmez)
     # ------------------------------------------------------------------
     def connect(self) -> None:
+        """Oracle'a bağlanır ve sorgu zaman aşımını ayarlar. oracledb kurulu değilse ConnectionError fırlatır. ORA-01017 veya 'invalid username' gibi hatalar AuthenticationError, ORA-12170 ve timeout TimeoutError, diğerleri ConnectionError olur."""
         if oracledb is None:
             raise ConnectionError(
                 "oracledb yüklü değil. 'pip install oracledb' çalıştırın.",
@@ -76,12 +82,15 @@ class OracleAdapter(DBAdapter):
                 service_name = self._service_name,
             )
             # Sorgu timeout — Oracle JDBC tarzı (ms cinsinden değil, saniye)
+            # TODO(kontrol): Üstteki yorum 'saniye' diyor ama python-oracledb call_timeout değerini milisaniye bekler; bu satır 1000 ile çarpıyor. Yorum ile kod çelişiyor, doğrulanmalı.
             self._conn.call_timeout = self.query_timeout_s * 1000
             logger.info("Oracle bağlantısı kuruldu: %s:%s/%s",
                         self.host, self.port, self._service_name)
         except oracledb.DatabaseError as exc:
+            # DİKKAT: Bu satır argüman sayısı tam 1 değilse ValueError fırlatır. Bu hata ConnectionError'a dönüşmez ve doğrudan yukarı çıkar.
             error, = exc.args
             msg = str(error.message).lower() if hasattr(error, 'message') else str(exc).lower()
+            # ORA-xxxxx, Oracle'ın hata kodudur. ORA-01017 yanlış kullanıcı ya da şifre, ORA-12170 bağlantı zaman aşımı demektir.
             if "ora-01017" in msg or "invalid username" in msg or "logon denied" in msg:
                 raise AuthenticationError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
             if "ora-12170" in msg or "timeout" in msg:
@@ -91,6 +100,7 @@ class OracleAdapter(DBAdapter):
             raise ConnectionError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
 
     def disconnect(self) -> None:
+        """Bağlantıyı kapatır. Hata olursa uyarı yazılır; _conn her durumda None yapılır."""
         try:
             if self._conn:
                 self._conn.close()
@@ -100,6 +110,7 @@ class OracleAdapter(DBAdapter):
             self._conn = None
 
     def health_check(self) -> HealthResult:
+        """SELECT 1 FROM DUAL ile yanıt süresini ölçer. Hata olursa exception fırlatmadan is_healthy=False döner."""
         try:
             t0 = time.perf_counter()
             with self._conn.cursor() as cur:
@@ -111,6 +122,7 @@ class OracleAdapter(DBAdapter):
             return HealthResult(is_healthy=False, latency_ms=0, message=str(exc))
 
     def get_metadata(self) -> DBMetadata:
+        """V$VERSION tablosunun ilk satırını (BANNER) sürüm bilgisi olarak alır."""
         with self._conn.cursor() as cur:
             cur.execute("SELECT BANNER FROM V$VERSION WHERE ROWNUM = 1")
             version = cur.fetchone()[0]
@@ -127,6 +139,7 @@ class OracleAdapter(DBAdapter):
     # Ana toplama metodu
     # ------------------------------------------------------------------
     def collect_metrics(self) -> list[MetricSchema]:
+        """Tüm kontrolleri sırayla çalıştırır. Her kontrol _safe_collect ile sarılır; biri hata verse diğerleri çalışır."""
         metrics = []
         checks = [
             (self._check_unused_tables,      "FR-COST-01"),
@@ -147,6 +160,8 @@ class OracleAdapter(DBAdapter):
     # DBA_TAB_MODIFICATIONS — son DML tarihi (DBMS_STATS.FLUSH_DATABASE_MONITORING_INFO sonrası güvenilir)
     # ------------------------------------------------------------------
     def _check_unused_tables(self) -> list[MetricSchema]:
+        """FR-COST-01: 30 gündür DML almamış ya da hiç DML almamış tabloları bulur. Büyükten küçüğe en fazla 20 tablo listelenir."""
+        # DBA_TAB_MODIFICATIONS, tabloda son DML zamanını tutar. DİKKAT: Bu bilgi bellekte biriktiği için DBMS_STATS.FLUSH_DATABASE_MONITORING_INFO çalıştırılmadan güncel olmayabilir.
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -193,6 +208,8 @@ class OracleAdapter(DBAdapter):
     # DBA_SEGMENTS — ayrılmış alan ile gerçek kullanım farkı
     # ------------------------------------------------------------------
     def _check_large_segments(self) -> list[MetricSchema]:
+        """FR-COST-02: 500 MB üzeri tablo segmentlerini bulur. Ayrılan alan kullanılan alanın iki katından büyükse HWM atığı notu eklenir. Önem derecesi her durumda 2'dir."""
+        # HWM (High Water Mark): tablonun bugüne kadar ulaştığı en yüksek alan. Silinen satırlar alanı geri vermez; bu yüzden ayrılan alan kullanılandan çok büyük olabilir.
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -218,6 +235,7 @@ class OracleAdapter(DBAdapter):
         results = []
         for obje, seg_tip, boyut_mb, num_rows, kullanilan_mb in rows:
             # HWM atığı: ayrılan alan kullanılanın 2 katından fazlaysa
+            # Not: İki dal da severity=2 veriyor; ayrım sadece detay metnini değiştiriyor.
             if kullanilan_mb and boyut_mb and boyut_mb > kullanilan_mb * 2:
                 severity = 2
                 detay = f"Boyut: {boyut_mb} MB | Kullanılan: {kullanilan_mb} MB | HWM atığı yüksek — SHRINK önerilir"
@@ -242,6 +260,7 @@ class OracleAdapter(DBAdapter):
     # FR-COST-03: Partitionsiz büyük tablolar
     # ------------------------------------------------------------------
     def _check_unpartitioned(self) -> list[MetricSchema]:
+        """FR-COST-03: 1 GB'tan büyük ve partition edilmemiş tabloları listeler (en fazla 10)."""
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -283,6 +302,8 @@ class OracleAdapter(DBAdapter):
     # DBA_TAB_COL_STATISTICS — DBMS_STATS tarafından toplanan istatistikler
     # ------------------------------------------------------------------
     def _check_null_ratio(self) -> list[MetricSchema]:
+        """FR-DQ-01: İstatistiklerdeki NULL oranı %50'yi aşan kolonları bulur (en fazla 20). Oran %80'i aşarsa önem derecesi 3 olur."""
+        # İstatistik tabanlı kontrol: gerçek tarama yapmaz, DBMS_STATS'ın topladığı NUM_NULLS değerini kullanır. İstatistik eskiyse sonuç da eskidir.
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -325,6 +346,7 @@ class OracleAdapter(DBAdapter):
     # FR-DQ-02: PK/UNIQUE kısıt eksik tablolar
     # ------------------------------------------------------------------
     def _check_duplicates(self) -> list[MetricSchema]:
+        """FR-DQ-02: Etkin PK veya UNIQUE kısıtı olmayan ve satırı bulunan tabloları bulur (en fazla 10). Kontrol adına rağmen tekrar kaydı aramaz."""
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -370,6 +392,7 @@ class OracleAdapter(DBAdapter):
     # DBA_TAB_MODIFICATIONS — bugün INSERT/UPDATE/DELETE yok
     # ------------------------------------------------------------------
     def _check_daily_load(self) -> list[MetricSchema]:
+        """FR-PIPE-01: 10.000'den fazla satırı olan ama bugün DML almamış tabloları bulur (en fazla 10)."""
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -416,6 +439,8 @@ class OracleAdapter(DBAdapter):
     # REDACTION_COLUMNS view'ı varsa maskeleme durumu kontrol edilir
     # ------------------------------------------------------------------
     def _check_sensitive_columns(self) -> list[MetricSchema]:
+        """FR-SEC-01: Hassas adlı kolonları DBA_TAB_COLUMNS içinde arar. REDACTION_COLUMNS görünümünde maskesi olanlar atlanır; görünüm okunamazsa tüm hassas kolonlar raporlanır."""
+        # Liste büyük harfle karşılaştırılır; Oracle kolon adlarını genelde büyük harfle saklar.
         hassas_sql = ", ".join(f"'{k}'" for k in HASSAS_KOLONLAR)
         sql = f"""
             SELECT
@@ -467,6 +492,8 @@ class OracleAdapter(DBAdapter):
     # V$SESSION + V$SQL — lisanssız, her Oracle'da çalışır
     # ------------------------------------------------------------------
     def _check_long_queries(self) -> list[MetricSchema]:
+        """FR-USER-01: 60 saniyeden uzun süredir aktif olan kullanıcı oturumlarını V$SESSION üzerinden bulur. Yetki yoksa kontrol atlanır ve OK döner."""
+        # V$SESSION çalışan oturumları gösterir. LAST_CALL_ET son çağrının başlangıcından bu yana geçen saniyedir; 60 saniyeden fazlası 'uzun' sayılır.
         sql = """
             SELECT * FROM (
                 SELECT
@@ -515,16 +542,19 @@ class OracleAdapter(DBAdapter):
     # Yardımcı metodlar
     # ------------------------------------------------------------------
     def _fetchall(self, sql: str, params: tuple = ()) -> list:
+        """SQL'i parametrelerle çalıştırıp tüm satırları döner."""
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchall()
 
     def _fetchone(self, sql: str, params: tuple = ()):
+        """SQL'i parametrelerle çalıştırıp tek satır döner. Sonuç yoksa None."""
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchone()
 
     def _ok(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Bir kontrolün sorunsuz olduğunu gösteren OK kaydı üretir. OK kaydında severity her zaman 1 olmalıdır."""
         return MetricSchema(
             db_type      = self.db_type,
             host         = self.host,

@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.env.*
+__pycache__/
+*.pyc
+archive/
+*.log
+*.bak
+*.backup
+docs/
+.venv
+venv
+*.md
+sql/
