@@ -2,6 +2,7 @@
 """Vault'a database credentials yükler"""
 
 import hvac
+import os
 import time
 import sys
 
