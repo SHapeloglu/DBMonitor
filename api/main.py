@@ -29,7 +29,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # DB config — env'den oku
 # ---------------------------------------------------------------------------
-# Log veritabanı ayarları ortam değişkenlerinden okunur. Varsayılanlar sadece yerel geliştirme içindir. DİKKAT: Kodda varsayılan bir şifre bulunur; üretimde DB_PASS mutlaka ortam değişkeniyle verilmelidir.
+def _required_env(name: str) -> str:
+    """Ortam değişkenini okur; yoksa veya boşsa adını belirterek hata verir. Kodda varsayılan şifre yoktur."""
+    value = os.getenv(name, "")
+    if not value:
+        raise RuntimeError(f"Zorunlu ortam değişkeni eksik: {name}")
+    return value
+
+# Log veritabanı ayarları ortam değişkenlerinden okunur. Host/port/isim/kullanıcı için varsayılanlar yerel geliştirme içindir.
+# DB_PASS zorunludur; yoksa uygulama içe aktarılırken açık bir hatayla durur.
 DB_CONFIG = {
     "host":    os.getenv("DB_HOST", "localhost"),
     "port":    int(os.getenv("DB_PORT", "5432")),
@@ -37,7 +45,7 @@ DB_CONFIG = {
     "db_type": "postgresql",
     "credentials": {
         "user":     os.getenv("DB_USER", "dquser"),
-        "password": os.getenv("DB_PASS", "dqpass"),
+        "password": _required_env("DB_PASS"),
     },
 }
 

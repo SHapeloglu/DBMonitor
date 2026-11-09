@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: dquser
-      POSTGRES_PASSWORD: dqpass
+      POSTGRES_PASSWORD: ${DQ_DB_PASSWORD:?set DQ_DB_PASSWORD in .env}
       POSTGRES_DB: dqmetrics
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -48,7 +48,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=dwhmonitor
       - DB_USER=dquser
-      - DB_PASS=dqpass
+      - DB_PASS=${DQ_DB_PASSWORD:?set DQ_DB_PASSWORD in .env}
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_TOKEN}
     depends_on:
