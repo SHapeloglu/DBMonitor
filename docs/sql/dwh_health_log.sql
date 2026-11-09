@@ -121,10 +121,10 @@ $$;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dwh_monitor_writer') THEN
-        CREATE ROLE dwh_monitor_writer LOGIN PASSWORD 'changeme_writer';
+        CREATE ROLE dwh_monitor_writer LOGIN PASSWORD 'CHANGE_ME_VIA_ENV';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dwh_monitor_reader') THEN
-        CREATE ROLE dwh_monitor_reader LOGIN PASSWORD 'changeme_reader';
+        CREATE ROLE dwh_monitor_reader LOGIN PASSWORD 'CHANGE_ME_VIA_ENV';
     END IF;
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Rol oluşturma atlandı: %', SQLERRM;

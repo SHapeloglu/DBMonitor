@@ -10,7 +10,7 @@ databases:
     enabled: true
     credentials:
       user: dquser
-      password: dqpass
+      password: ${DQ_DB_PASSWORD}
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
@@ -23,7 +23,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_MSSQL_PASSWORD}
 
   - name: prod-mysql
     adapter: adapters.mysql_adapter.MySQLAdapter
@@ -36,7 +36,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_MYSQL_PASSWORD}
 
   - name: prod-mariadb
     adapter: adapters.mysql_adapter.MySQLAdapter
@@ -49,7 +49,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_MARIADB_PASSWORD}
 
   - name: prod-oracle
     adapter: adapters.oracle_adapter.OracleAdapter
@@ -62,7 +62,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_ORACLE_PASSWORD}
 
   - name: generic-odbc-fallback
     adapter: adapters.generic_odbc_adapter.GenericODBCAdapter
@@ -73,4 +73,4 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_ODBC_PASSWORD}

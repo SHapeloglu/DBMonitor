@@ -21,7 +21,7 @@ databases:
     enabled: true
     credentials:
       user: dquser
-      password: dqpass          # prod'da Vault: vault://secret/dwh/postgresql
+      password: ${DQ_DB_PASSWORD}          # prod'da Vault: vault://secret/dwh/postgresql
 
   # ---------------------------------------------------------------------------
   # MSSQL Server — ODBC Driver 18 gerektirir
@@ -37,7 +37,7 @@ databases:
     enabled: false              # Gerçek bağlantı bilgisi gelince true yap
     credentials:
       user: etl_svc
-      password: changeme        # vault://secret/dwh/mssql
+      password: ${ETL_MSSQL_PASSWORD}        # vault://secret/dwh/mssql
 
   # ---------------------------------------------------------------------------
   # MySQL — Community Edition, pymysql driver
@@ -53,7 +53,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme        # vault://secret/dwh/mysql
+      password: ${ETL_MYSQL_PASSWORD}        # vault://secret/dwh/mysql
 
   # ---------------------------------------------------------------------------
   # MariaDB — mysql_adapter.py paylaşılır, db_type: mariadb ile ayrışır
@@ -69,7 +69,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme        # vault://secret/dwh/mariadb
+      password: ${ETL_MARIADB_PASSWORD}        # vault://secret/dwh/mariadb
 
   # ---------------------------------------------------------------------------
   # Oracle — python-oracledb Thin mode (Oracle Client kurulumu gerekmez)
@@ -85,7 +85,7 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme        # vault://secret/dwh/oracle
+      password: ${ETL_ORACLE_PASSWORD}        # vault://secret/dwh/oracle
 
   # ---------------------------------------------------------------------------
   # Generic ODBC — Fallback: tanınmayan / özel DB'ler
@@ -100,4 +100,4 @@ databases:
     enabled: false
     credentials:
       user: etl_svc
-      password: changeme
+      password: ${ETL_ODBC_PASSWORD}
