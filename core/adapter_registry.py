@@ -16,6 +16,7 @@ from typing import Iterator
 import yaml
 
 from core.base_adapter import DBAdapter, ConfigurationError
+from core.config_env import expand_env
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ class AdapterRegistry:
         with open(self._config_path, encoding="utf-8") as f:
             raw = yaml.safe_load(f)
 
+        raw = expand_env(raw)
         databases = raw.get("databases", [])
         if not databases:
             logger.warning("databases.yaml'da hiç DB tanımı yok.")
