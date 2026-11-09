@@ -5,7 +5,7 @@ notifications:
     smtp_host: mail.kurum.com
     smtp_port: 587
     smtp_user: dwh-monitor@kurum.com
-    smtp_password: changeme
+    smtp_password: ${SMTP_PASSWORD}
     from: dwh-monitor@kurum.com
     to:
       - dwh-team@kurum.com
@@ -21,4 +21,4 @@ notifications:
     webhook_url: http://localhost:9000/alerts
     headers:
       Content-Type: application/json
-      Authorization: Bearer changeme
+      Authorization: Bearer ${WEBHOOK_TOKEN}

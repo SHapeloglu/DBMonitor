@@ -21,6 +21,7 @@ from typing import Optional
 import requests
 import yaml
 
+from core.config_env import expand_env
 from core.metric_schema import MetricSchema
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class Notifier:
         """notifications.yaml içindeki 'notifications' listesini okuyup kural olarak saklar."""
         with open(self._config_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
+        cfg = expand_env(cfg)
         self._rules = cfg.get("notifications", [])
         logger.info("Notifier hazır: %d kural yüklendi.", len(self._rules))
 
