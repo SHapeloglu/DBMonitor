@@ -29,6 +29,11 @@ Vault token'ını koda gömmek anti-pattern'dir. Bunun yerine kullan:
 
 ## F6-02 Vault Entegrasyonu (Oturum 11)
 
+### Mevcut Durum (doğrulandı)
+- Kimlik bilgileri şu an `config/databases.yaml` içinde düz metin (`password` satırları: 13, 26, 39, 52, 65, 76). Dosya git'te izleniyor; K-02 açık.
+- Monitor'ün kendi DB bağlantısı ortam değişkenlerinden okunur: `DB_USER`, `DB_PASS` (`api/main.py:34-35`).
+- Vault dev modunda çalışıyor. Dev modda restart'ta veri kaybolduğu için kimlik bilgileri YAML'a taşındı (session.md, Oturum 12). `config/databases.yaml`'da `vault://` referansı olmadığı için monitor çalışma zamanında Vault'tan kimlik bilgisi çekmiyor.
+
 ### Neden Vault?
 Üretimde şifreler düz metin → güvenlik riski + Git'te ifşa.
 Merkezi sır yönetimi gerekli.
@@ -36,13 +41,13 @@ Merkezi sır yönetimi gerekli.
 ### Neler Değişti
 - Docker: Vault konteyneri (dev modu)
 - Python: hvac istemcisi + adapter_registry entegrasyonu
-- Yapılandırma: databases.yaml vault:// referansları
+- Yapılandırma: databases.yaml'da vault:// referansı yok; kimlik bilgileri düz metin (bkz. Mevcut Durum)
 - Kurulum: VAULT_ADDR + VAULT_TOKEN ortam değişkenleri
 
 ### Nasıl Çalışır
 1. adapter_registry.load_all() başladığında
 2. Her DB config için _resolve_credentials() çağırılır
-3. credentials: vault://db/name ise Vault'tan çeker
+3. credentials: vault://... ise Vault'tan çeker (`core/adapter_registry.py:177-199`); mevcut config'te vault:// yok
 4. DB adaptörü çözümlenen kimlik bilgileriyle connect() yapar
 
 ### Dev ve Prod
@@ -50,13 +55,15 @@ Merkezi sır yönetimi gerekli.
 - Prod: sealed mod, kalıcı backend, denetim logları
 
 ### Sonraki
-F6-04 Prometheus alarm kurallarıyla devam et.
+F6-04 tamamlandı. Sıradaki: F6-01 Kubernetes Helm chart (öncelik Yüksek, açık; owner kararı gerektirmiyor).
 
 ---
 
 ## F6-06 Dokümantasyon — Tamamlandı ✅
 
 **2026-08-16 — F6-06 Tamamlandı**
+
+> tarih çelişkisi: CLAUDE.md 2026-08-16, session.md Oturum 11 — doğrulanmalı
 
 7 YAML config file + SQL schema + README:
 - Tümü production-ready, fully annotated
