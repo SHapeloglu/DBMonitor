@@ -11,7 +11,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F0-01 | ✅ `preflight_check.py` | 🔴 Bloker | Tamamlandı |
 | F0-02 | ✅ `dwh_health_log` DDL | 🔴 Bloker | PostgreSQL 16, monitor schema, 24 aylık partition |
 | F0-04 | ✅ `docker-compose.yml` | Yüksek | dq-postgres + dwh-monitor, port 8005 |
-| F0-05 | ⬜ CI pipeline — lint + test + docker build | Orta | GitHub Actions önerilir |
+| F0-05 | ✅ CI pipeline — lint + test + docker build | Orta | Tamamlandı (PR #7, `.github/workflows/ci.yml`) |
 
 ---
 
@@ -24,7 +24,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F1-03 | ✅ `AdapterRegistry` — YAML + importlib | `core/adapter_registry.py` | Tamamlandı |
 | F1-04 | ✅ `CollectorEngine` — APScheduler + circuit breaker | `core/collector_engine.py` | Tamamlandı. K-01 → APScheduler seçildi |
 | F1-05 | ✅ `Notifier` — SMTP + Slack + PagerDuty + Teams | `core/notifier.py` | Tamamlandı, 3 kural yüklü |
-| F1-06 | 🔄 `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Kısmi: yalnızca yerel arşiv. S3/Azure export stub (`core/retention_manager.py:257-273`), K-06 açık |
+| F1-06 | 🔄 `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Kısmi: yalnızca yerel arşiv. S3/Azure export stub, K-06 açık. Tek ifadede arşivleme düzeltmesi PR #2'de (taslak, staging testi bekliyor) |
 
 ---
 
@@ -45,10 +45,10 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F3-01 | ✅ FastAPI app — `api/main.py` | Tamamlandı, port 8005 |
 | F3-02 | ✅ `GET /health` | Tamamlandı |
 | F3-03 | ✅ `GET /metrics` — Prometheus format | Tamamlandı, doğrulandı |
-| F3-04 | ⬜ `GET /logs` — JSON filtreli | Yapılmadı |
+| F3-04 | ✅ `GET /logs` — JSON filtreli | Tamamlandı (PR #6, `api/logs.py`) |
 | F3-05 | ✅ `GET /logs/summary` | Tamamlandı (`api/main.py:118`) |
 | F3-06 | ✅ `GET /adapters` | Tamamlandı (`api/main.py:127`) |
-| F3-07 | ⬜ API auth — Bearer / API key | Yapılmadı. K-07 kararı bekliyor |
+| F3-07 | ✅ API auth — `X-API-Key` | Tamamlandı (PR #6, `api/auth.py`). `API_KEY` boşsa kapalı; `/health` hariç hepsi korunur |
 
 ---
 
@@ -56,7 +56,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 | # | Görev | Durum |
 |---|---|---|
-| F4-01..F4-09 | ✅ MSSQLAdapter — 8 FR kontrolü | Tamamlandı. `enabled: false`, gerçek bağlantı bilgisi bekliyor |
+| F4-01..F4-09 | ✅ MSSQLAdapter — 8 FR kontrolü | Tamamlandı. `enabled: false`, gerçek bağlantı bilgisi bekliyor. Mantık düzeltmeleri PR #3'te (taslak) |
 
 **Çalışan FR kontrolleri:** FR-COST-01/03, FR-DQ-04, FR-PIPE-01/04, FR-USER-04, FR-SEC-01/03  
 **Driver:** ODBC Driver 18 for SQL Server — host + Docker image'a kuruldu  
@@ -82,7 +82,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 | # | Görev | Öncelik | Durum |
 |---|---|---|---|
-| F6-01 | Kubernetes Helm chart | Yüksek | ⬜ Yapılmadı |
+| F6-01 | Kubernetes Helm chart | Yüksek | 🔄 PR #8 (taslak), helm ile test edilmedi |
 | F6-02 | ✅ Secrets yönetimi — Vault | Yüksek | ✅ Tamamlandı (dev mode + plain text fallback). Not: dev modunda tamamlandı; prod kurulumu ve düz metin kaldırma K-02'de açık. F0-03 ile birleştirildi (tekrar eden satır). |
 | F6-03 | Grafana dashboard JSON | Orta | ⬜ Deferred |
 | F6-04 | ✅ Prometheus alert rules | Orta | ✅ Tamamlandı (6 alert rule, Alertmanager UP) |
@@ -103,22 +103,36 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | # | Karar | Durum | Not |
 |---|---|---|---|
 | K-01 | APScheduler mi, Celery mi? | ✅ APScheduler | Seçildi, çalışıyor |
-| K-02 | Secrets yönetimi | ⬜ Açık | Şu an düz text |
+| K-02 | Secrets yönetimi | ⬜ Açık | Düz metin. PR #5 (`${ENV}` açma) taslak; Vault dev modda, sunucuda durdurulmuş |
 | K-03 | Oracle AWR/ASH lisansı | ✅ Yok | Sadece V$/DBA_* kullanılıyor |
 | K-04 | MySQL edition | ✅ Community | INFORMATION_SCHEMA + performance_schema |
 | K-05 | Teradata BRD | ⬜ Açık | Rakip analizi sonrası |
 | K-06 | Cold storage backend | ⬜ Açık | S3, Azure Blob, yerel |
-| K-07 | /metrics endpoint auth | ⬜ Açık | API Key, Bearer JWT, IP whitelist |
+| K-07 | /metrics endpoint auth | ✅ API Key | PR #6. Bearer JWT / IP whitelist yapılmadı. Prometheus scrape'e başlık eklenmeli |
+
+---
+
+## Açık PR'lar (hepsi taslak, main'e alınmadı)
+
+| PR | Dal | İçerik | Not |
+|---|---|---|---|
+| #2 | `fix/retention-cte-move` | Retention: tek ifadede arşivleme, ölü kod | Staging testi gerekli |
+| #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | Gerçek MSSQL ile test gerekli |
+| #5 | `chore/config-secrets-env` | YAML'da `${NAME}` açma, şifreleri `.env`'e taşıma | Uyumsuz: 8 ortam değişkeni zorunlu; sunucuda image yeniden build gerekir |
+| #8 | `feat/helm-chart` | Helm chart (F6-01) | `helm lint/template` çalıştırılmadı |
+| #9 | `chore/rename-db-user-apache` | DB kullanıcısı `dquser` → `apache` | #5 ile çakışması beklenir; sunucuda zaten uygulandı |
 
 ---
 
 ## Sonraki oturumda yapılacaklar
 
-1. **Helm chart (F6-01)** veya **Rakip analizi** — hangisi öncelikli?
-2. Rakip analizine göre DB2 / MongoDB / Teradata önceliklerini belirle
-3. Gerçek MSSQL/Oracle/MySQL bağlantı bilgileri gelince adapter'ları aktif et
-4. F3-04 — `GET /logs` (JSON filtreli). F3-05/06 tamamlandı.
-5. F6 — Production hazırlık (kalan görevler)
+1. Açık PR'ları sırayla incele, staging'de test et ve birleştir (önce #2, #3; sonra #5 ve #9 çakışmasını çöz; #8 en son)
+2. Sunucuda PR #5 sonrası düz metin şifreleri `.env`'e taşı (image yeniden build gerekir)
+3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (dev konteyner sunucuda durdurulmuş, `postgres-local` sırrı eski)
+4. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini gerçek değerle değiştir (DBA işi) ve adapter'ları `enabled: true` yap
+5. Sunucu gece yedeğine `pg_dump` (dwhmonitor) ve `config/` ekle; harici disk kopyasının çalıştığını doğrula
+6. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle
+7. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik)
 
 ---
 
@@ -148,3 +162,8 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | Tarih | Görev | Detay |
 |---|---|---|
 | 2026-08-16 | GitHub README.md | 389 satır, kapsamlı proje dokümantasyonu, commit e7a1183 |
+| 2026-11-09 | CI (F0-05) | PR #7: ruff, py_compile + pytest, docker build |
+| 2026-11-09 | `GET /logs` ve API anahtarı (F3-04, F3-07) | PR #6 |
+| 2026-11-08..09 | Sunucu ↔ GitHub senkronu, güvenlik düzeltmeleri | PR #1: sabit şifre varsayılanları kaldırıldı, portlar 127.0.0.1'e bağlandı |
+| 2026-11-09 | Md çelişkileri giderildi | PR #4 |
+| 2026-11-09 | Sunucuda DB şifresi döndürüldü, kullanıcı `apache` yapıldı | Repoda yalnızca PR #9 (taslak). Dosya izinleri 600, `.bak` kopyaları silindi |

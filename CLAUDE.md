@@ -1,3 +1,19 @@
+# DWH İzleme Sistemi (DBMonitor) — Proje Kuralları
+
+Çok veritabanlı DWH sağlık izleme: adapter'lar → CollectorEngine → PostgreSQL (`monitor.dwh_health_log`) → FastAPI `/metrics` → Prometheus/Alertmanager. Ayrıntı: `architect.md`. Görevler: `task.md`. Fikirler: `backlog.md`. Oturum günlüğü: `session.md`.
+
+## Çalışma kuralları
+- `main`'e doğrudan push yok. Özellik dalı + taslak PR (`gh pr create --draft`). `gh pr edit` Projects classic hatası verir: `gh api -X PATCH repos/SHapeloglu/DBMonitor/pulls/N -F body=@dosya`.
+- Kodda şifre/token yok. `DB_PASS` zorunlu ortam değişkenidir; `.env` ve `config/databases.yaml` sunucuda mod 600 olmalı ve git'e girmemeli.
+- Testler: `pytest` (`tests/test_api.py`), lint: `ruff check .` (CI: `.github/workflows/ci.yml`). Yerelde Docker/helm olmayabilir.
+- Doküman değişince `task.md` durumu, `session.md` günlüğü ve ilgili PR numarası birlikte güncellenir. Durum yazarken kodu/`git log`'u kontrol et; hafızadan yazma.
+- Sunucu (Contabo): `/opt/dwh-db-monitor`, compose proje adı aynı klasör. Servis adları `postgres`, `dwh-monitor`, `prometheus`, `alertmanager`, `vault`. `dwh-monitor` imajı yerel build'dir (`build: .`); kod değişince `docker compose build dwh-monitor` gerekir, değişmediyse `up -d --no-build` yeterli.
+
+## Güncel durum (2026-11-11)
+- main: PR #1, #4, #6, #7 birleşti. Faz 0–5 bitti; F0-05, F3-04, F3-07 bitti.
+- Açık taslak PR'lar: #2 retention, #3 MSSQL, #5 `${ENV}` açma (uyumsuz), #8 Helm, #9 kullanıcı `apache`. Ayrıntı: `task.md`.
+- Sunucuda DB kullanıcısı `apache`, şifre döndürülmüş; repoda hâlâ `dquser` (PR #9 bekliyor).
+- Adapter'lar (PostgreSQL hariç) `enabled: false`; uzak DB şifreleri placeholder.
 
 ---
 
@@ -55,7 +71,7 @@ Merkezi sır yönetimi gerekli.
 - Prod: sealed mod, kalıcı backend, denetim logları
 
 ### Sonraki
-F6-04 tamamlandı. Sıradaki: F6-01 Kubernetes Helm chart (öncelik Yüksek, açık; owner kararı gerektirmiyor).
+F6-04 tamamlandı. F6-01 Helm chart PR #8'de (taslak). Güncel liste: `task.md`.
 
 ---
 
@@ -71,7 +87,7 @@ F6-04 tamamlandı. Sıradaki: F6-01 Kubernetes Helm chart (öncelik Yüksek, aç
 - GitHub: docs/config/, docs/sql/
 - Push: commit 24ae3b7
 
-**Next: F6-01 (Helm) veya Rakip Analizi?**
+**Next:** güncel liste için `task.md`.
 
 ---
 
@@ -96,4 +112,4 @@ Commit: e7a1183 — README.md (389 satır)
 - Project status tablosu
 - Tech stack tablosu
 
-**Next: F6-01 (Helm) veya Rakip Analizi veya F3-04/05/06 (API log endpoints)**
+**Next:** güncel liste için `task.md` (F3-04/05/06 tamamlandı).

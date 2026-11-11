@@ -1,5 +1,30 @@
 # DWH İzleme Sistemi — Oturum Özeti
 
+> Sıra: en yeni oturum en üstte. 11. ve 12. oturumlardaki "Sonraki" listeleri o günün durumudur; güncel liste `task.md`'dedir.
+
+## Oturum 13 — Sunucu ↔ GitHub senkronu, güvenlik ve yedek denetimi (2026-11-08..11)
+
+### Yapılanlar
+1. Contabo sunucusundaki `/opt/dwh-db-monitor` ile GitHub `SHapeloglu/DBMonitor` karşılaştırıldı. Fark: sunucuda sabit şifre varsayılanları, açık portlar, `.bak` kopyaları ve kod yorumları farklıydı.
+2. PR'lar: #1 (sunucu senkronu + güvenlik) ve #4 (md çelişkileri), #6 (`GET /logs` + `X-API-Key`), #7 (CI) main'e birleşti. #2 (retention), #3 (MSSQL), #5 (`${ENV}` açma), #8 (Helm), #9 (kullanıcı `apache`) taslak olarak açık.
+3. Sunucuda DB şifresi döndürüldü; DB rolü `dquser` → `apache` yapıldı. Bağlantı ve veri doğrulandı, `/health` OK.
+4. Sunucuda `docker-compose.yml`, `config/databases.yaml`, `.env` izinleri 600 yapıldı; `.bak`/`.backup` ve eski rotasyon yedekleri silindi.
+5. Sunucu yedekleri denetlendi (restic, cron 04:30, 14 gün / 8 hafta / 12 ay). Restore testi başarılı. `dwhmonitor` için `pg_dump` ve `config/` eklemeli betik hazırlandı ama uygulanmadı.
+
+### Bulgular
+- Repoda ve sunucuda düz metin şifreler hâlâ var (`databases.yaml`, compose). Çözüm PR #5'te; deploy için image yeniden build ve 8 ortam değişkeni gerekir.
+- Vault dev modunda, sunucuda durdurulmuş; monitor çalışma zamanında Vault'tan okumuyor.
+- Uzak DB'lerdeki `etl_svc` hesapları placeholder şifre kullanıyor; adapter'lar `enabled: false`.
+- Harici yedek kopyası yalnızca Windows tarafında aylık diske; sunucudan doğrulanamıyor.
+
+### Araç notları
+- `gh pr edit` Projects classic hatası veriyor: `gh api -X PATCH repos/SHapeloglu/DBMonitor/pulls/N -F body=@dosya` kullan.
+- GitHub bağlantısı zaman zaman takılıyor; `timeout` ve `-c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20` kullan.
+
+### Sonraki
+Bkz. `task.md` "Sonraki oturumda yapılacaklar".
+
+---
 ## Oturum 11 — F6-02 Vault Setup (2026-08-14)
 
 ### Sorun

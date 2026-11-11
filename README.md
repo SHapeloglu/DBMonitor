@@ -162,7 +162,7 @@ databases:
     enabled: true
     credentials:
       user: dquser
-      password: dqpass          # veya: vault://secret/dwh/postgresql
+      password: dqpass          # veya: vault://db/postgres-local
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
@@ -209,8 +209,14 @@ notifications:
 
 | Endpoint | Metot | Açıklama |
 |----------|--------|-------------|
-| `/health` | GET | Adaptör durumu ve engine sağlığı |
+| `/health` | GET | Adaptör durumu ve engine sağlığı (kimlik doğrulama yok) |
 | `/metrics` | GET | Prometheus exposition formatı |
+| `/collect` | GET | Toplamayı elle tetikler |
+| `/logs` | GET | Filtreli JSON liste: `db_name`, `kontrol_kodu`, `sonuc`, `severity`, `since`, `until`, `limit` (≤1000), `offset` |
+| `/logs/summary` | GET | Kategori bazlı özet |
+| `/adapters` | GET | Adaptörlerin circuit breaker durumu |
+
+**API anahtarı:** `API_KEY` ortam değişkeni tanımlıysa `/health` dışındaki endpoint'ler `X-API-Key` başlığı ister (yanlışsa 401). Tanımlı değilse kimlik doğrulama kapalıdır ve başlangıçta uyarı loglanır. Üretimde tanımla; Prometheus kullanıyorsan scrape yapılandırmasına başlık ekle.
 
 ### /metrics Örnek Çıktısı
 
@@ -322,7 +328,7 @@ Engine kodunda değişiklik yok. Yeni adaptör AdapterRegistry üzerinden otomat
 
 | Servis | Port | Amaç |
 |---------|------|---------|
-| dwh-monitor | 8005 | FastAPI - /health, /metrics |
+| dwh-monitor | 8005 | FastAPI - /health, /metrics, /logs, /adapters |
 | Prometheus | 9090 | Metrik toplama + alarm kuralı değerlendirme |
 | Alertmanager | 9093 | Alarm yönlendirme ve tekilleştirme |
 | PostgreSQL | 5433 | dwh_health_log depolama (host portu) |
@@ -337,14 +343,14 @@ Kimlik bilgileri `vault://` URI formatıyla HashiCorp Vault'ta saklanabilir:
 ```yaml
 credentials:
   user: etl_svc
-  password: vault://secret/dwh/postgresql
+  password: vault://db/postgres-local
 ```
 
 Vault konteyneri yeniden başladıktan sonra (dev modu):
 
 ```bash
 export VAULT_TOKEN=<new-token>
-python vault-init.py          # host üzerinden çalıştır
+python scripts/vault-init.py   # host üzerinden çalıştır
 docker compose restart dwh-monitor
 ```
 
@@ -365,15 +371,16 @@ RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çal
 | Aşama | Açıklama | Durum |
 |--------|-------------|--------|
 | F0 | Altyapı - DDL, Docker, ön kontrol | Bitti |
+| F0-05 | CI - GitHub Actions (ruff, pytest, docker build) | Bitti |
 | F1 | Çekirdek engine - registry, scheduler, notifier, retention | Bitti |
 | F2 | PostgreSQL adaptörü (referans uygulama) | Bitti |
-| F3 | API katmanı - /health, /metrics | Bitti |
+| F3 | API katmanı - /health, /metrics, /logs, /adapters, API anahtarı | Bitti |
 | F4 | MSSQL adaptörü - 8 FR kontrolü, ODBC Driver 18 | Bitti, kimlik bilgisi bekleniyor |
 | F5 | MySQL, MariaDB, Oracle, Genel ODBC adaptörleri | Bitti, kimlik bilgisi bekleniyor |
 | F6-02 | HashiCorp Vault entegrasyonu | Bitti |
 | F6-04 | Prometheus alarm kuralları (6 kural) + Alertmanager | Bitti |
 | F6-06 | Belgeler - yapılandırma dosyaları, SQL şeması | Bitti |
-| F6-01 | Kubernetes Helm chart | Planlandı |
+| F6-01 | Kubernetes Helm chart | Taslak PR (#8), test bekliyor |
 | F6-03 | Grafana panel JSON'u | Ertelendi |
 | F6-05 | Yatay ölçekleme - Redis koordinasyonu | Planlandı |
 | - | IBM DB2 adaptörü | Rakip analizi bekleniyor |
