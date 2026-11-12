@@ -11,7 +11,17 @@ route:
 receivers:
   - name: 'default-receiver'
     webhook_configs:
+      # KARAR BEKLİYOR: localhost konteynerin kendisidir; gerçek alıcı adresiyle değiştirilmeli.
+      # (Compose'da 5001 portunu dinleyen servis yok; bu URL'ye gönderim başarısız olur.)
       - url: 'http://localhost:5001/alerts'
         send_resolved: true
 
-inhibit_rules: []
+# critical uyarı aktifken aynı db_type/host/db_name için warning bastırılır.
+# Not: critical ve warning kuralların alertname'i farklı olduğundan 'alertname'
+# equal listesine konmaz (hiç eşleşmezdi).
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['db_type', 'host', 'db_name']

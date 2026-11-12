@@ -15,7 +15,8 @@ groups:
       # Herhangi bir adapter'dan severity=3 — 5 dakika boyunca
       # -----------------------------------------------------------------------
       - alert: DWHCriticalHealthIssue
-        expr: dwh_health_check{severity="3"} > 0
+        # Not: metrikte 'severity' etiketi yok; önem derecesi örnek değeridir (OK=0, WARNING=2, ERROR=3).
+        expr: dwh_health_check == 3
         for: 5m
         labels:
           severity: critical
@@ -32,7 +33,7 @@ groups:
       # Güvenlik tehdidi — 1 dakika tolerans (hızlı yanıt gerektirir)
       # -----------------------------------------------------------------------
       - alert: DWHSecurityThreat
-        expr: dwh_health_check{kategori="guvenlik", severity="3"} > 0
+        expr: dwh_health_check{kategori="guvenlik"} == 3
         for: 1m
         labels:
           severity: critical
@@ -47,7 +48,7 @@ groups:
       # Pipeline kırılması — 10 dakika boyunca veri gelmiyor
       # -----------------------------------------------------------------------
       - alert: DWHPipelineBreakdown
-        expr: dwh_health_check{kategori="pipeline", severity="3"} > 0
+        expr: dwh_health_check{kategori="pipeline"} == 3
         for: 10m
         labels:
           severity: critical
@@ -62,7 +63,7 @@ groups:
       # Genel uyarı — severity=2, 15 dakika boyunca
       # -----------------------------------------------------------------------
       - alert: DWHWarningIssue
-        expr: dwh_health_check{severity="2"} > 0
+        expr: dwh_health_check == 2
         for: 15m
         labels:
           severity: warning
@@ -74,10 +75,11 @@ groups:
             Kontrol: {{ $labels.kontrol_adi }}
 
       # -----------------------------------------------------------------------
-      # Sistem çapı kriz — 3'ten fazla kritik sorun aynı anda
+      # Sistem çapı kriz — 3'ten fazla kategoride kritik sorun aynı anda
       # -----------------------------------------------------------------------
       - alert: DWHMultipleCategoriesCritical
-        expr: count(dwh_health_check{severity="3"}) > 3
+        # Kritik (değer 3) sorunu olan FARKLI kategori sayısı (seri sayısı değil).
+        expr: count(count by (kategori) (dwh_health_check == 3)) > 3
         for: 10m
         labels:
           severity: critical
@@ -90,7 +92,8 @@ groups:
       # Tüm adapter'lar yanıt vermiyor
       # -----------------------------------------------------------------------
       - alert: DWHAllAdaptersDown
-        expr: count(dwh_health_check) == 0
+        # count() boş vektörde 0 değil boş döner; seri yokluğu absent() ile yakalanır.
+        expr: absent(dwh_health_check) or (up{job="dwh-metrics"} == 0)
         for: 5m
         labels:
           severity: critical

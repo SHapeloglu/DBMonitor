@@ -4,7 +4,8 @@ groups:
     rules:
 
       - alert: DWHCriticalHealthIssue
-        expr: dwh_health_check{severity="3"} > 0
+        # Not: metrikte 'severity' etiketi yok; önem derecesi örnek değeridir (OK=0, WARNING=2, ERROR=3).
+        expr: dwh_health_check == 3
         for: 5m
         labels:
           severity: critical
@@ -18,7 +19,7 @@ groups:
             Severity: 3 (Kritik)
 
       - alert: DWHSecurityThreat
-        expr: dwh_health_check{kategori="guvenlik", severity="3"} > 0
+        expr: dwh_health_check{kategori="guvenlik"} == 3
         for: 1m
         labels:
           severity: critical
@@ -30,7 +31,7 @@ groups:
             {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
 
       - alert: DWHPipelineBreakdown
-        expr: dwh_health_check{kategori="pipeline", severity="3"} > 0
+        expr: dwh_health_check{kategori="pipeline"} == 3
         for: 10m
         labels:
           severity: critical
@@ -42,7 +43,7 @@ groups:
             {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
 
       - alert: DWHWarningIssue
-        expr: dwh_health_check{severity="2"} > 0
+        expr: dwh_health_check == 2
         for: 15m
         labels:
           severity: warning
@@ -54,7 +55,8 @@ groups:
             Kontrol: {{ $labels.kontrol_adi }}
 
       - alert: DWHMultipleCategoriesCritical
-        expr: count(dwh_health_check{severity="3"}) > 3
+        # Kritik (değer 3) sorunu olan FARKLI kategori sayısı (seri sayısı değil).
+        expr: count(count by (kategori) (dwh_health_check == 3)) > 3
         for: 10m
         labels:
           severity: critical
@@ -64,7 +66,8 @@ groups:
           description: "{{ $value }} kategori'de kritik sorun"
 
       - alert: DWHAllAdaptersDown
-        expr: count(dwh_health_check) == 0
+        # count() boş vektörde 0 değil boş döner; seri yokluğu absent() ile yakalanır.
+        expr: absent(dwh_health_check) or (up{job="dwh-metrics"} == 0)
         for: 5m
         labels:
           severity: critical
