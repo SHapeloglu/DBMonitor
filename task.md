@@ -130,7 +130,7 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 2. Sunucuda PR #5 sonrası düz metin şifreleri `.env`'e taşı (image yeniden build gerekir)
 3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (dev konteyner sunucuda durdurulmuş, `postgres-local` sırrı eski)
 4. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini gerçek değerle değiştir (DBA işi) ve adapter'ları `enabled: true` yap
-5. Sunucu gece yedeğine `pg_dump` (dwhmonitor) ve `config/` ekle; harici disk kopyasının çalıştığını doğrula
+5. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula. `pg_dump` + `config/` gece yedeğine eklendi (2026-11-12); ilk cron çalışması 04:30'da `restic_son.txt` / `restic_cron.log` ile kontrol edilmeli
 6. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle
 7. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik)
 

@@ -22,7 +22,7 @@ Fazlara bölünmüş planlı iş `task.md`'de (Faz 0–6, açık kararlar K-01�
 - Kontrol sonuçlarını VCE / DQ projeleriyle ortak bir "kalite skoru" modelinde birleştirme.
 - Adapter başına bağlantı testi CLI komutu (`scripts/`) — gerçek MSSQL/Oracle/MySQL bilgileri geldiğinde `enabled: true` öncesi doğrulama için.
 - Sunucudaki `docker-compose.yml` ve `config/` değişikliklerini git'te tutmak (`.bak` kopyaları silindi; ayrı bir deploy deposu veya PR #5 sonrası `.env` ayrımı).
-- Sunucu gece yedeğine `dwhmonitor` `pg_dump` ve `config/` eklemek; harici disk kopyasını doğrulamak.
+- Harici (Windows aylık disk) yedek kopyasını doğrulamak. `pg_dump` + `config/` 2026-11-12'de gece yedeğine eklendi.
 - Vault kararı: kalıcı üretim Vault kurmak ya da Vault'u ve `vault://` kodunu kaldırmak (şu an dev modda ve durdurulmuş).
 - Zayıf DB parolasını güçlü bir değerle değiştirmek (sunucuda).
 

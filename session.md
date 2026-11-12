@@ -9,7 +9,7 @@
 2. PR'lar: #1 (sunucu senkronu + güvenlik) ve #4 (md çelişkileri), #6 (`GET /logs` + `X-API-Key`), #7 (CI) main'e birleşti. #2 (retention), #3 (MSSQL), #5 (`${ENV}` açma), #8 (Helm), #9 (kullanıcı `apache`) taslak olarak açık.
 3. Sunucuda DB şifresi döndürüldü; DB rolü `dquser` → `apache` yapıldı. Bağlantı ve veri doğrulandı, `/health` OK.
 4. Sunucuda `docker-compose.yml`, `config/databases.yaml`, `.env` izinleri 600 yapıldı; `.bak`/`.backup` ve eski rotasyon yedekleri silindi.
-5. Sunucu yedekleri denetlendi (restic, cron 04:30, 14 gün / 8 hafta / 12 ay). Restore testi başarılı. `dwhmonitor` için `pg_dump` ve `config/` eklemeli betik hazırlandı ama uygulanmadı.
+5. Sunucu yedekleri denetlendi (restic, cron 04:30, 14 gün / 8 hafta / 12 ay). Restore testi başarılı. `dwhmonitor` için `pg_dump` ve `config/` eklenen betik 2026-11-12'de `/opt/yedek/restic_yedek.sh`'ye uygulandı (eski hâli `restic_yedek.sh.yedek-20261112`); dump bloğu elle test edildi (320 KB, 433 giriş).
 
 ### Bulgular
 - Repoda ve sunucuda düz metin şifreler hâlâ var (`databases.yaml`, compose). Çözüm PR #5'te; deploy için image yeniden build ve 8 ortam değişkeni gerekir.
