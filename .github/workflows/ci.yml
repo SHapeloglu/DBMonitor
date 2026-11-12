@@ -41,7 +41,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest
+          # httpx: starlette.testclient (tests/test_api.py) bunu gerektirir
+          pip install pytest httpx
 
       - name: Byte-compile all Python files
         run: |
