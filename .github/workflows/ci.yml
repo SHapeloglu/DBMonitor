@@ -50,6 +50,9 @@ jobs:
             | xargs -0 python -m py_compile
 
       - name: Run pytest (only if tests/ exists)
+        env:
+          # api.main içe aktarılırken zorunlu; testler gerçek DB'ye bağlanmaz
+          DB_PASS: ci-test-only
         run: |
           if [ -d tests ]; then
             pytest -q
