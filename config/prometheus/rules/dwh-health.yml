@@ -4,7 +4,13 @@ groups:
     rules:
 
       - alert: DWHCriticalHealthIssue
-        expr: dwh_health_check{severity="3"} > 0
+        # Not: metrikte 'severity' etiketi yok; önem derecesi örnek değeridir (OK=0, WARNING=2, ERROR=3).
+        # Pencere notu: /metrics açık zaman damgası yazar ve toplama saatlik çalışır (COLLECT_CRON varsayılanı).
+        # Açık zaman damgalı örnek anlık sorguda ~5 dk (lookback) görünür; bu yüzden ifadeler
+        # last_over_time(...[70m]) kullanır: 70m = 1 saatlik toplama aralığı + 10 dk tolerans.
+        # DWHAllAdaptersDown için 2h = en az iki toplama döngüsü kaçırılırsa alarm.
+        # COLLECT_CRON değişirse bu pencereler (70m, 2h) yeni aralığa göre ayarlanmalıdır.
+        expr: last_over_time(dwh_health_check[70m]) == 3
         for: 5m
         labels:
           severity: critical
@@ -18,7 +24,7 @@ groups:
             Severity: 3 (Kritik)
 
       - alert: DWHSecurityThreat
-        expr: dwh_health_check{kategori="guvenlik", severity="3"} > 0
+        expr: last_over_time(dwh_health_check{kategori="guvenlik"}[70m]) == 3
         for: 1m
         labels:
           severity: critical
@@ -30,7 +36,7 @@ groups:
             {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
 
       - alert: DWHPipelineBreakdown
-        expr: dwh_health_check{kategori="pipeline", severity="3"} > 0
+        expr: last_over_time(dwh_health_check{kategori="pipeline"}[70m]) == 3
         for: 10m
         labels:
           severity: critical
@@ -42,7 +48,7 @@ groups:
             {{ $labels.db_type }}/{{ $labels.host }}/{{ $labels.db_name }}
 
       - alert: DWHWarningIssue
-        expr: dwh_health_check{severity="2"} > 0
+        expr: last_over_time(dwh_health_check[70m]) == 2
         for: 15m
         labels:
           severity: warning
@@ -54,7 +60,8 @@ groups:
             Kontrol: {{ $labels.kontrol_adi }}
 
       - alert: DWHMultipleCategoriesCritical
-        expr: count(dwh_health_check{severity="3"}) > 3
+        # Kritik (değer 3) sorunu olan FARKLI kategori sayısı (seri sayısı değil).
+        expr: count(count by (kategori) (last_over_time(dwh_health_check[70m]) == 3)) > 3
         for: 10m
         labels:
           severity: critical
@@ -64,7 +71,9 @@ groups:
           description: "{{ $value }} kategori'de kritik sorun"
 
       - alert: DWHAllAdaptersDown
-        expr: count(dwh_health_check) == 0
+        # count() boş vektörde 0 değil boş döner; seri yokluğu absent_over_time() ile yakalanır
+        # (2h pencere: saatlik toplamada normal boşlukta yanlış alarm olmasın; bkz. pencere notu).
+        expr: absent_over_time(dwh_health_check[2h]) or (up{job="dwh-metrics"} == 0)
         for: 5m
         labels:
           severity: critical
