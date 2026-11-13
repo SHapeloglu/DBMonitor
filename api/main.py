@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from core.adapter_registry import AdapterRegistry
-from core.collector_engine import CollectorEngine
+from core.collector_engine import CollectionBusy, CollectorEngine
 from core.metric_schema import metrics_to_prometheus_block, summary_by_kategori
 from core.notifier import Notifier
 from core.retention_manager import RetentionManager
@@ -114,9 +114,12 @@ def health():
     if engine is None:
         return {"status": "starting"}
     circuits = engine.get_circuit_status()
+    # Tüm devreler açıksa servis ayakta ama hiçbir DB toplanamıyor: degraded.
+    all_open = bool(circuits) and all(c["state"] == "OPEN" for c in circuits.values())
     return {
-        "status":   "ok",
-        "circuits": circuits,
+        "status":     "degraded" if all_open else "ok",
+        "circuits":   circuits,
+        "persist_ok": getattr(engine, "get_last_persist_ok", lambda: None)(),
     }
 
 
@@ -134,7 +137,10 @@ def collect_now():
     """Manuel koleksiyon tetikle — test ve preflight için."""
     if engine is None:
         return {"error": "Engine hazır değil"}
-    metrics = engine.collect_now()
+    try:
+        metrics = engine.collect_now()
+    except CollectionBusy:
+        raise HTTPException(status_code=409, detail="Toplama zaten çalışıyor") from None
     return {
         "collected": len(metrics),
         "summary":   summary_by_kategori(metrics),

@@ -41,7 +41,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest
+          # httpx: starlette.testclient (tests/test_api.py) bunu gerektirir
+          pip install pytest httpx
 
       - name: Byte-compile all Python files
         run: |
@@ -49,9 +50,13 @@ jobs:
             | xargs -0 python -m py_compile
 
       - name: Run pytest (only if tests/ exists)
+        env:
+          # api.main içe aktarılırken zorunlu; testler gerçek DB'ye bağlanmaz
+          DB_PASS: ci-test-only
         run: |
           if [ -d tests ]; then
-            pytest -q
+            # python -m: kök dizini sys.path'e koyar (tests/ paket değil, api.main çözülsün)
+            python -m pytest -q
           else
             echo "No tests/ directory found, skipping pytest."
           fi

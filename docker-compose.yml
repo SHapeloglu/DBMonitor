@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_USER: apache
       POSTGRES_PASSWORD: ${DQ_DB_PASSWORD:?set DQ_DB_PASSWORD in .env}
-      POSTGRES_DB: dqmetrics
+      POSTGRES_DB: dwhmonitor
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./sql/dwh_health_log.sql:/docker-entrypoint-initdb.d/01_dwh_health_log.sql
@@ -30,7 +30,7 @@ services:
     networks:
       - dwh-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apache -d dqmetrics"]
+      test: ["CMD-SHELL", "pg_isready -U apache -d dwhmonitor"]
       interval: 10s
       timeout: 5s
       retries: 5
