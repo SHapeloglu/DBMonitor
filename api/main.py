@@ -50,7 +50,7 @@ DB_CONFIG = {
     "db_name": os.getenv("DB_NAME", "dwhmonitor"),
     "db_type": "postgresql",
     "credentials": {
-        "user":     os.getenv("DB_USER", "dquser"),
+        "user":     os.getenv("DB_USER", "apache"),
         "password": _required_env("DB_PASS"),
     },
 }

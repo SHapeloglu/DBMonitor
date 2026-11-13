@@ -20,7 +20,7 @@ databases:
     query_timeout_s: 30
     enabled: true
     credentials:
-      user: dquser
+      user: apache
       password: dqpass          # prod'da Vault: vault://secret/dwh/postgresql
 
   # ---------------------------------------------------------------------------

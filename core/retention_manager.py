@@ -288,7 +288,7 @@ class RetentionManager:
             host     = self._db_config["host"],
             port     = self._db_config.get("port", 5432),
             dbname   = self._db_config["db_name"],
-            user     = creds.get("user", "dquser"),
+            user     = creds.get("user", "apache"),
             password = creds.get("password", ""),
             connect_timeout = self._db_config.get("connect_timeout_s", 10),
         )

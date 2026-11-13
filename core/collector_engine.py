@@ -314,7 +314,7 @@ class CollectorEngine:
             host            = self.db_config["host"],
             port            = self.db_config.get("port", 5432),
             dbname          = self.db_config["db_name"],
-            user            = creds.get("user", "dquser"),
+            user            = creds.get("user", "apache"),
             password        = creds.get("password", ""),
             connect_timeout = self.db_config.get("connect_timeout_s", 10),
         )

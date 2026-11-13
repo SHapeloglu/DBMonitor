@@ -98,7 +98,7 @@ def setup_secrets(client, passwords):
         "postgres-local": {
             "host": "postgres",
             "port": "5432",
-            "user": "dquser",
+            "user": "apache",
             "password": passwords["postgres-local"]
         }
     }

@@ -19,7 +19,7 @@ services:
     container_name: dq-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: dquser
+      POSTGRES_USER: apache
       POSTGRES_PASSWORD: ${DQ_DB_PASSWORD:?set DQ_DB_PASSWORD in .env}
       POSTGRES_DB: dwhmonitor
     volumes:
@@ -30,7 +30,7 @@ services:
     networks:
       - dwh-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dquser -d dwhmonitor"]
+      test: ["CMD-SHELL", "pg_isready -U apache -d dwhmonitor"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,7 +47,7 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=dwhmonitor
-      - DB_USER=dquser
+      - DB_USER=apache
       - DB_PASS=${DQ_DB_PASSWORD:?set DQ_DB_PASSWORD in .env}
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_TOKEN}
