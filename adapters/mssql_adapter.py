@@ -229,7 +229,8 @@ class MSSQLAdapter(DBAdapter):
         # İki aşamalı kontrol: önce ilgili kolonlar bulunur, sonra sadece onlar için biçim sorgusu çalıştırılır.
         discovery_sql = """
             SELECT TOP 20
-                TABLE_SCHEMA + '.' + TABLE_NAME AS tablo,
+                TABLE_SCHEMA,
+                TABLE_NAME,
                 COLUMN_NAME,
                 DATA_TYPE
             FROM INFORMATION_SCHEMA.COLUMNS
@@ -244,30 +245,35 @@ class MSSQLAdapter(DBAdapter):
         if not cols:
             return [self._ok("FR-DQ-04", "format_ihlali", "Format kontrol edilecek kolon bulunamadı")]
         results = []
-        for tablo, kolon, _ in cols:
+        for schema, tablo_adi, kolon, _ in cols:
+            tablo = f"{schema}.{tablo_adi}"  # yalnızca raporlama (etkilenen_obje) için
+            # Dinamik SQL'e giren adlar köşeli parantezle sarılır; içindeki ']' karakteri
+            # ']]' olarak kaçışlanır (SQL Server tanımlayıcı kuralı).
+            tablo_q = "[" + schema.replace("]", "]]") + "].[" + tablo_adi.replace("]", "]]") + "]"
+            kolon_q = "[" + kolon.replace("]", "]]") + "]"
             if "iban" in kolon.lower():
                 # DİKKAT: Tablo ve kolon adları metadata'dan alınıp köşeli parantez içine alınmadan yazılır. Boşluk ya da özel karakter içeren adlarda sorgu hata verir ve o kolon atlanır.
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND {kolon} NOT LIKE 'TR[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND {kolon_q} NOT LIKE 'TR[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                      AND LEN({kolon_q}) > 0
                 """
             elif any(x in kolon.lower() for x in ["tckn", "tc_kimlik"]):
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND ({kolon} NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
-                           OR LEN({kolon}) != 11)
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND ({kolon_q} NOT LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                           OR LEN({kolon_q}) != 11)
+                      AND LEN({kolon_q}) > 0
                 """
             else:
                 pattern_sql = f"""
-                    SELECT COUNT(*) FROM {tablo}
-                    WHERE {kolon} IS NOT NULL
-                      AND {kolon} NOT LIKE '+[0-9]%'
-                      AND {kolon} NOT LIKE '0[0-9][0-9][0-9]%'
-                      AND LEN({kolon}) > 0
+                    SELECT COUNT(*) FROM {tablo_q}
+                    WHERE {kolon_q} IS NOT NULL
+                      AND {kolon_q} NOT LIKE '+[0-9]%'
+                      AND {kolon_q} NOT LIKE '0[0-9][0-9][0-9]%'
+                      AND LEN({kolon_q}) > 0
                 """
             # Bir kolonun taraması hata verirse (yetki, veri tipi vb.) sadece uyarı yazılır; diğer kolonlar taranmaya devam eder.
             try:
@@ -289,6 +295,18 @@ class MSSQLAdapter(DBAdapter):
                     ))
             except Exception as exc:
                 logger.warning("FR-DQ-04 tablo tarama hatası %s.%s: %s", tablo, kolon, exc)
+                results.append(MetricSchema(
+                    db_type        = self.db_type,
+                    host           = self.host,
+                    db_name        = self.db_name,
+                    kategori       = Kategori.KALITE,
+                    kontrol_kodu   = "FR-DQ-04",
+                    kontrol_adi    = "format_ihlali",
+                    sonuc          = Sonuc.WARNING,
+                    severity       = 2,
+                    etkilenen_obje = f"{tablo}.{kolon}",
+                    detay          = f"Format kontrolü çalıştırılamadı: {str(exc)[:300]}",
+                ))
         if not results:
             return [self._ok("FR-DQ-04", "format_ihlali", "Format ihlali tespit edilmedi")]
         return results
@@ -390,8 +408,11 @@ class MSSQLAdapter(DBAdapter):
         """
         try:
             rows = self._fetchall(sql)
-        except Exception:
-            return [self._ok("FR-USER-04", "buyuk_sorgu", "sys.dm_exec_query_stats erişim yetkisi yok — atlandı")]
+        except Exception as exc:
+            if self._is_permission_error(exc):
+                return [self._skipped_warning("FR-USER-04", "buyuk_sorgu",
+                                              "sys.dm_exec_query_stats erişim yetkisi yok — kontrol atlandı")]
+            raise
         if not rows:
             return [self._ok("FR-USER-04", "buyuk_sorgu", "5s+ ortalama süreli sorgu yok")]
         results = []
@@ -422,7 +443,7 @@ class MSSQLAdapter(DBAdapter):
             FROM sys.masked_columns mc
             JOIN sys.columns c ON c.object_id = mc.object_id AND c.column_id = mc.column_id
             JOIN sys.objects o ON o.object_id = mc.object_id
-            WHERE mc.is_masked = 0
+            WHERE mc.is_masked = 1
         """
         try:
             masked_rows = self._fetchall(ddm_sql)
@@ -441,15 +462,25 @@ class MSSQLAdapter(DBAdapter):
         col_rows = self._fetchall(fallback_sql)
 
         if masked_rows is not None:
+            # DDM durumu okundu: maskeli kolonlar (is_masked = 1) dışarıda bırakılır.
             masked_set = {(r[0], r[1]) for r in masked_rows}
             unmasked = [(r[0], r[1], r[2]) for r in col_rows if (r[0], r[1]) not in masked_set]
+            ddm_okunamadi = False
         else:
-            unmasked = col_rows
+            # DDM sorgusu hata verdi: maskeleme durumu bilinmiyor. Güvenlik kontrolü
+            # doğrulanamayan durumu geçmiş saymaz; kolon adı eşleşenler ERROR olarak raporlanır.
+            unmasked = [(r[0], r[1], r[2]) for r in col_rows]
+            ddm_okunamadi = True
 
         if not unmasked:
             return [self._ok("FR-SEC-01", "hassas_kolon", "Maskelenmemiş hassas kolon adı yok")]
         results = []
         for row in unmasked:
+            if ddm_okunamadi:
+                detay = (f"Tip: {row[2]} — DDM durumu okunamadı (sys.masked_columns); "
+                         f"maskeleme doğrulanamadı, kolon maskesiz olabilir")
+            else:
+                detay = f"Tip: {row[2]} — DDM maskesi eksik"
             results.append(MetricSchema(
                 db_type        = self.db_type,
                 host           = self.host,
@@ -460,7 +491,7 @@ class MSSQLAdapter(DBAdapter):
                 sonuc          = Sonuc.ERROR,
                 severity       = 3,
                 etkilenen_obje = f"{row[0]}.{row[1]}",
-                detay          = f"Tip: {row[2]} — DDM maskesi eksik",
+                detay          = detay,
             ))
         return results
 
@@ -489,8 +520,11 @@ class MSSQLAdapter(DBAdapter):
         # DİKKAT: Yetki yoksa kontrol hata vermeden OK döner. Bu, kontrolün yapılamadığı anlamına gelir; OK sonucu yanıltıcı olabilir.
         try:
             rows = self._fetchall(sql)
-        except Exception:
-            return [self._ok("FR-SEC-03", "mesai_disi_sorgu", "sys.dm_exec_requests erişim yetkisi yok — atlandı")]
+        except Exception as exc:
+            if self._is_permission_error(exc):
+                return [self._skipped_warning("FR-SEC-03", "mesai_disi_sorgu",
+                                              "sys.dm_exec_requests erişim yetkisi yok — kontrol atlandı")]
+            raise
         if not rows:
             return [self._ok("FR-SEC-03", "mesai_disi_sorgu", "Mesai dışı büyük sorgu tespit edilmedi")]
         results = []
@@ -538,6 +572,31 @@ class MSSQLAdapter(DBAdapter):
             severity     = 1,
             detay        = detay,
         )
+
+    def _skipped_warning(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Yetki eksikliyle atlanan kontrol: OK değil, WARNING."""
+        return MetricSchema(
+            db_type      = self.db_type,
+            host         = self.host,
+            db_name      = self.db_name,
+            kategori     = self._kategori_from_kod(kod),
+            kontrol_kodu = kod,
+            kontrol_adi  = ad,
+            sonuc        = Sonuc.WARNING,
+            severity     = 2,
+            detay        = detay,
+        )
+
+    @staticmethod
+    def _is_permission_error(exc: Exception) -> bool:
+        """SQL Server yetki hatası mı? (SQLSTATE 42000 + 'permission' metni,
+        veya VIEW SERVER STATE izni eksikliği.) Diğer hatalar False döner."""
+        if pyodbc is None or not isinstance(exc, pyodbc.Error):
+            return False
+        # Hata numarası dil bağımsızdır (metin İngilizce olmayan sunucularda değişir):
+        # 229 = SELECT izni yok, 297 = VIEW SERVER STATE / izin yok.
+        msg = str(exc)
+        return any(f"({num})" in msg for num in ("229", "297"))
 
     @staticmethod
     def _detect_driver() -> Optional[str]:
