@@ -167,9 +167,10 @@ class CollectorEngine:
             str(v) for v in ((cfg.get("credentials") or {}).get("password"),) if v
         )
         return MetricSchema(
-            db_type      = str(cfg.get("db_type") or cfg.get("adapter") or "generic"),
-            host         = str(cfg.get("host") or "unknown"),
-            db_name      = str(cfg.get("db_name") or name),
+            # Tablo sınırları: db_type 20, host/db_name 255 karakter; db_type yoksa 'generic'.
+            db_type      = str(cfg.get("db_type") or "generic")[:20],
+            host         = str(cfg.get("host") or "unknown")[:255],
+            db_name      = str(cfg.get("db_name") or name)[:255] or "unknown",
             kategori     = "sistem",
             kontrol_kodu = "FR-SYS-01",
             kontrol_adi  = "Baglanti/saglik kontrolu",

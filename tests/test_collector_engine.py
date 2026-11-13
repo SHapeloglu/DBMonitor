@@ -149,6 +149,37 @@ def test_connect_error_metric_has_no_secret_and_is_truncated():
     assert len(m.detay) <= 500
 
 
+def test_missing_db_type_falls_back_to_generic_and_truncates(monkeypatch):
+    eng = _engine({"bad": FakeAdapter("bad", connect_exc=RuntimeError("boom"))})
+    long = "h" * 400
+    monkeypatch.setattr(
+        eng.registry, "get_config",
+        lambda name: {"adapter": "adapters.oracle_adapter.OracleAdapter.Very.Long.Path",
+                      "host": long, "db_name": long},
+    )
+    (m,) = eng._collect_all()
+    assert m.db_type == "generic"
+    assert len(m.host) == 255 and len(m.db_name) == 255
+    MetricSchema.model_validate(m.model_dump())    # doğrulamayı geçer
+
+
+def test_lock_released_after_exception():
+    eng = _engine({"bad": FakeAdapter("bad", connect_exc=RuntimeError("boom"))})
+    eng._collect_all()
+    assert not eng._collect_lock.locked()
+    assert len(eng._collect_all()) == 1            # ikinci tur çalışır, atlanmaz
+
+    def explode(metrics):
+        raise RuntimeError("beklenmedik")
+
+    eng.notifier.evaluate = explode
+    with pytest.raises(RuntimeError):
+        eng._collect_all()
+    assert not eng._collect_lock.locked()
+    eng.notifier.evaluate = lambda metrics: None
+    assert len(eng._collect_all()) == 1
+
+
 def test_open_circuit_yields_error_metric():
     eng = _engine({"a": FakeAdapter("a", healthy=False)}, circuit_failure_threshold=1)
     eng._collect_all()                     # devreyi açar
