@@ -1,0 +1,10 @@
+{
+  "task": "_ornek",
+  "amac": "Örnek sözleşme. Gerçek görevde dosya adını worktree klasör adıyla aynı yap: .claude/scope/<görev>.json",
+  "worktree": ".claude/worktrees/_ornek",
+  "read": ["core/**", "tests/**", "sql/**"],
+  "write": ["core/retention_manager.py", "tests/test_retention*.py"],
+  "deny_write": ["config/**", "docker-compose.yml"],
+  "bash_extra": ["python3 -m pytest -q tests/test_retention.py"],
+  "done_when": "pytest -q tests/test_retention.py geçer ve git diff --name-only yalnızca 'write' desenlerine uyar"
+}
