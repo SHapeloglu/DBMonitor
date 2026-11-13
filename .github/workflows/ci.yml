@@ -55,7 +55,8 @@ jobs:
           DB_PASS: ci-test-only
         run: |
           if [ -d tests ]; then
-            pytest -q
+            # python -m: kök dizini sys.path'e koyar (tests/ paket değil, api.main çözülsün)
+            python -m pytest -q
           else
             echo "No tests/ directory found, skipping pytest."
           fi
