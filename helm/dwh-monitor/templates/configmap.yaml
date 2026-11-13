@@ -1,0 +1,17 @@
+{{- if not .Values.config.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dwh-monitor.fullname" . }}-config
+  labels:
+    {{- include "dwh-monitor.labels" . | nindent 4 }}
+# Sanitized defaults from files/config/. Credentials are REPLACE_ME and every
+# database is disabled. Override with config.existingConfigMap for real use.
+data:
+  databases.yaml: |
+{{ .Files.Get "files/config/databases.yaml" | indent 4 }}
+  notifications.yaml: |
+{{ .Files.Get "files/config/notifications.yaml" | indent 4 }}
+  retention.yaml: |
+{{ .Files.Get "files/config/retention.yaml" | indent 4 }}
+{{- end }}

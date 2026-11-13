@@ -1,0 +1,91 @@
+# Default values for dwh-monitor.
+# NEVER put passwords or tokens in this file. Secrets are read from an
+# existing Kubernetes Secret (see existingSecret) or from Vault (not in this chart yet).
+
+image:
+  # Placeholder - replace with your own registry/repository. Not a real registry.
+  repository: REPLACE_ME/dwh-monitor
+  tag: ""                  # defaults to Chart.appVersion when empty
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# The collector (APScheduler) runs INSIDE the API process. Each replica would
+# run its own collection cycle and store duplicate rows. Keep this at 1 until
+# F6-05 (Redis-based coordination) is implemented.
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8005
+
+# Non-secret environment variables. Keys map 1:1 to env vars read by api/main.py.
+env:
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "dwhmonitor"
+  DB_USER: "dquser"
+  COLLECT_CRON: "0 * * * *"
+  RETENTION_CRON: "0 1 1 * *"
+
+# Name of an EXISTING Secret containing the key DB_PASS (metrics DB password).
+# Create it outside Helm, e.g.:
+#   kubectl create secret generic dwh-monitor-db --from-literal=DB_PASS='...'
+existingSecret: "dwh-monitor-db"
+
+# Monitored-database configuration (databases.yaml, notifications.yaml, retention.yaml).
+# By default the chart ships sanitized copies from files/config/ (credentials are
+# REPLACE_ME, all DBs disabled). For real deployments, create a ConfigMap from your
+# own config directory and reference it here. Do not commit real values to Git.
+config:
+  existingConfigMap: ""    # e.g. dwh-monitor-config (keys: databases.yaml, notifications.yaml, retention.yaml)
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dwh-monitor.example.internal
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+probes:
+  liveness:
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Prometheus Operator ServiceMonitor. Requires the monitoring.coreos.com CRDs.
+serviceMonitor:
+  enabled: false
+  interval: 60s
+  scrapeTimeout: 30s
+  labels: {}
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
