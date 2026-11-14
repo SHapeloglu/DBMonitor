@@ -1,6 +1,6 @@
 # DWH İzleme Sistemi — Mimari
 
-Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-11). Açık PR'larda olan ama henüz main'e girmemiş değişiklikler "Bekleyen" olarak işaretlidir.
+Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-14). Main'e birleşenler: PR #1, #4, #6, #7, #9, #11, #12, #13, #14. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #10, #15) "Bekleyen" olarak işaretlidir.
 
 ## 1. Amaç
 
@@ -30,7 +30,7 @@ config/databases.yaml ──► AdapterRegistry ──► DBAdapter (5 platform)
 | Ortak sözleşme | `core/base_adapter.py` | `DBAdapter` ABC, `HealthResult`, `DBMetadata`, `AdapterError` ailesi |
 | Veri modeli | `core/metric_schema.py` | `MetricSchema` (Pydantic), `Sonuc` (OK/WARNING/ERROR), Prometheus ve log satırı dönüşümü |
 | Yükleyici | `core/adapter_registry.py` | YAML okur, adapter sınıfını `importlib` ile yükler, `vault://` referanslarını çözer |
-| Zamanlayıcı | `core/collector_engine.py` | Saatlik toplama (`COLLECT_CRON`, varsayılan `0 * * * *`), adapter başına circuit breaker (3 hata → 300 sn bekleme), sonuçları loga yazar |
+| Zamanlayıcı | `core/collector_engine.py` | Saatlik toplama (`COLLECT_CRON`, varsayılan `0 * * * *`), adapter başına circuit breaker (3 hata → 300 sn bekleme), sonuçları loga yazar. Bağlantı/sağlık hatası veren veya devresi açık DB için o tura ERROR metriği üretir (kategori `sistem`, `kontrol_kodu` `FR-SYS-01`, severity 3). Aynı anda tek tur: toplama kilidi alınamazsa scheduler turu atlar, elle istek `CollectionBusy` alır. Açılışta cron'u beklemeden bir toplama yapılır (PR #14) |
 | Bildirim | `core/notifier.py` | SMTP, Slack, PagerDuty, Teams, genel webhook; DB'ye bağımlı değil |
 | Saklama | `core/retention_manager.py` | 24 ay aktif saklama, eski satırları tek CTE ifadesiyle arşiv tablosuna taşır; `RETENTION_CRON` varsayılan `0 1 1 * *` |
 | Adapter'lar | `adapters/*.py` | `postgresql` (8 FR), `mssql` (8 FR), `mysql` (MySQL + MariaDB), `oracle`, `generic_odbc` (3 FR) |
@@ -52,9 +52,9 @@ Sonuç değerleri: `OK`, `WARNING`, `ERROR`. Severity 1–3. **Bekleyen (PR #3):
 
 | Endpoint | Auth | Açıklama |
 |---|---|---|
-| `GET /health` | yok | Servis ve circuit breaker durumu |
+| `GET /health` | yok | `status`: `ok` veya `degraded` (tüm devreler açıksa; engine hazır değilse `starting`), `persist_ok` (son log yazımı başarılı mı), `circuits` |
 | `GET /metrics` | API anahtarı | Prometheus formatı |
-| `GET /collect` | API anahtarı | Elle toplama tetikler |
+| `GET /collect` | API anahtarı | Elle toplama tetikler; toplama zaten çalışıyorsa HTTP 409 |
 | `GET /logs/summary` | API anahtarı | Kategori bazlı özet |
 | `GET /logs` | API anahtarı | Filtreli liste: `db_name`, `kontrol_kodu`, `sonuc`, `severity`, `since`, `until`, `limit` (≤1000), `offset` |
 | `GET /adapters` | API anahtarı | Adapter'ların circuit breaker durumları |
@@ -63,7 +63,7 @@ Sonuç değerleri: `OK`, `WARNING`, `ERROR`. Severity 1–3. **Bekleyen (PR #3):
 
 ## 6. Yapılandırma
 
-`config/` altında: `databases.yaml`, `notifications.yaml`, `retention.yaml`, `alertmanager.yml`, `prometheus/prometheus.yml`, `prometheus/rules/dwh-health.yml` (6 alarm kuralı: `DWHCriticalHealthIssue`, `DWHSecurityThreat`, `DWHPipelineBreakdown`, `DWHWarningIssue`, `DWHMultipleCategoriesCritical`, `DWHAllAdaptersDown`). Açıklamalı örnekler `docs/config/` altındadır.
+`config/` altında: `databases.yaml`, `notifications.yaml`, `retention.yaml`, `alertmanager.yml`, `prometheus/prometheus.yml`, `prometheus/rules/dwh-health.yml` (6 alarm kuralı: `DWHCriticalHealthIssue`, `DWHSecurityThreat`, `DWHPipelineBreakdown`, `DWHWarningIssue`, `DWHMultipleCategoriesCritical`, `DWHAllAdaptersDown`). Kurallar PR #11 ile örnek değerine göre yazıldı (OK=0, WARNING=2, ERROR=3) ve pencerelidir: `last_over_time(dwh_health_check[70m])`; `DWHAllAdaptersDown` `absent_over_time(dwh_health_check[2h])` kullanır. Pencereler saatlik `COLLECT_CRON` varsayılanına göre seçilmiştir; cron değişirse ayarlanmalıdır. Metrikte `severity` etiketi yoktur (`severity` yalnızca alarm etiketidir). Açıklamalı örnekler `docs/config/` altındadır.
 
 Monitor'ün kendi log DB bağlantısı ortam değişkenlerinden gelir: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`. `DB_PASS` zorunludur, kodda varsayılan şifre yoktur.
 
@@ -73,7 +73,11 @@ Monitor'ün kendi log DB bağlantısı ortam değişkenlerinden gelir: `DB_HOST`
 
 `docker-compose.yml` servisleri: `postgres` (container `dq-postgres`, host portu 127.0.0.1:5433), `dwh-monitor` (127.0.0.1:8005), `prometheus` (9090), `alertmanager` (9093), `vault` (8200, dev). Tüm portlar yalnızca 127.0.0.1'e bağlıdır. `DQ_DB_PASSWORD` `.env`'den zorunlu okunur.
 
-**Bekleyen:** Helm chart (PR #8, F6-01, taslak), DB kullanıcısı adının `apache` olması (PR #9; sunucuda zaten uygulandı, repo hâlâ `dquser`).
+DB kullanıcısı `apache` (PR #9 main'de; `api/main.py` varsayılanı `apache`).
+
+**Bekleyen:** Helm chart (PR #8, F6-01, taslak).
+
+Sunucuda nginx yalnızca `/health` yolunu dışarıya açar; diğer yollar 403 döner (`return 403;`). `nginx -t` doğrulanamadı (DOĞRULANAMADI).
 
 CI: `.github/workflows/ci.yml` — ruff, py_compile + pytest, docker build (PR'larda ve main'e push'ta).
 
@@ -85,8 +89,8 @@ Gerçek durum: Vault **dev modunda** (bellek içi, her açılışta rastgele tok
 
 ## 9. Saklama
 
-`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır. Bu düzeltme PR #2'de (taslak), main'de hâlâ eski kod vardır.
+`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık; bu iki backend yalnızca log yazar, `core/retention_manager.py` içinde "henüz tam implemente edilmedi" — arşivleme yapılmaz), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır. Bu düzeltme PR #2'de (taslak), main'de hâlâ eski kod vardır.
 
 ## 10. Dokümantasyon
 
-`docs/config/` (7 YAML), `docs/sql/` (DDL). Kök dizindeki çalışma dosyaları: `CLAUDE.md` (proje kuralları), `task.md` (görevler), `session.md` (oturum günlüğü), `backlog.md` (fikir havuzu), `README.md` (genel tanıtım).
+`docs/config/` (7 YAML), `docs/sql/` (DDL). Kök dizindeki çalışma dosyaları: `CLAUDE.md` (proje kuralları), `task.md` (görevler), `session.md` (oturum günlüğü), `backlog.md` (fikir havuzu), `README.md` (genel tanıtım), `yedek.md` (yedekleme notları; git'te izlenmiyor), `.claude/` (ajan çalışma klasörü: worktree'ler, bulgular; izlenmiyor).
