@@ -5,7 +5,7 @@
 ## Çalışma kuralları
 - `main`'e doğrudan push yok. Özellik dalı + taslak PR (`gh pr create --draft`). `gh pr edit` Projects classic hatası verir: `gh api -X PATCH repos/SHapeloglu/DBMonitor/pulls/N -F body=@dosya`.
 - Kodda şifre/token yok. `DB_PASS` zorunlu ortam değişkenidir; `.env` ve `config/databases.yaml` sunucuda mod 600 olmalı. Sır içeren dosyalar git'e girmemeli; mevcut durum: `config/databases.yaml` git'te izleniyor (PR #5 kapsamında çözülecek).
-- Testler: `pytest` (`tests/test_api.py`), lint: `ruff check .` (CI: `.github/workflows/ci.yml`). Yerelde Docker/helm olmayabilir.
+- Testler: `pytest` (`tests/test_api.py`, `tests/test_collector_engine.py`), lint: `ruff check .` (CI: `.github/workflows/ci.yml`). Yerelde Docker/helm olmayabilir.
 - Doküman değişince `task.md` durumu, `session.md` günlüğü ve ilgili PR numarası birlikte güncellenir. Durum yazarken kodu/`git log`'u kontrol et; hafızadan yazma.
 - Sunucu (Contabo): `/opt/dwh-db-monitor`, compose proje adı aynı klasör. Servis adları `postgres`, `dwh-monitor`, `prometheus`, `alertmanager`, `vault`. `dwh-monitor` imajı yerel build'dir (`build: .`); kod değişince `docker compose build dwh-monitor` gerekir, değişmediyse `up -d --no-build` yeterli.
 
@@ -95,7 +95,7 @@ F6-04 tamamlandı. F6-01 Helm chart PR #8'de (taslak). Güncel liste: `task.md`.
 
 **2026-08-26 — Kapsamlı GitHub README push edildi**
 
-Commit: e7a1183 — README.md (commit tarihi 2026-08-26, `git log`; o commit'te 389 satır. Bugünkü README.md 409 satır)
+Commit: e7a1183 — README.md (commit tarihi 2026-08-26, `git log`; o commit'te 389 satır. Bugünkü README.md 413 satır)
 
 İçerik:
 - Badges (Python, FastAPI, PostgreSQL, Prometheus, Docker)

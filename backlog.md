@@ -42,7 +42,7 @@ Kaynak: doğrulayıcı kararları (V1–V5), 2026-11-14. Bu F-kodları `task.md`
 - **F23** — API özel `_open_connection` ve `CircuitBreaker` özel alanlarına kilitsiz erişiyor — düşük — CONFIRMED, açık.
 - **F25** — Varsayılan kullanıcı üç dosyada hâlâ `dquser` (PR #9 sonrası `apache` ile tutarsız) — düşük — CONFIRMED. ✅ kapandı: PR #9 ile birleşti (2026-11-13); `dquser` origin/main'de yok.
 - **F26** — `databases.yaml` iddiası: sır dosyası okunamadığından kanıt alınamadı — düşük — REJECTED (kanıtsız).
-- **F27** — Test kapsamı: `tests/test_api.py` ve `tests/test_collector_engine.py` (PR #14). Notifier ve AdapterRegistry hâlâ testsiz; CircuitBreaker doğrudan test edilmiyor; RetentionManager yalnızca collector testinde dolaylı geçiyor (2026-11-24, `tests/` içeriği) — orta — CONFIRMED, kısmen açık.
+- **F27** — Test kapsamı: `tests/test_api.py` ve `tests/test_collector_engine.py` (PR #14). Notifier ve AdapterRegistry hâlâ testsiz; CircuitBreaker doğrudan test edilmiyor; RetentionManager hiçbir testte geçmiyor; tests/test_collector_engine.py yalnızca FakeRetention kullanıyor (2026-11-24, `tests/` içeriği) — orta — CONFIRMED, kısmen açık.
 - **F28** — `ruff.toml` yalnızca 4 kural grubu seçiyor (F401/F841 yakalanmaz); CI `tests/` yoksa atlıyor — düşük — CONFIRMED, açık.
 
 PR'ı olan bulgular (bilgi için; durum 2026-11-24, `gh pr list`):
