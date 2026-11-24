@@ -83,7 +83,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | # | Görev | Öncelik | Durum |
 |---|---|---|---|
 | F6-01 | Kubernetes Helm chart | Yüksek | 🔄 PR #8 (taslak), helm ile test edilmedi |
-| F6-02 | 🔄 Secrets yönetimi — Vault | Yüksek | 🔄 Dev modda tamamlandı; prod kurulumu ve düz metin kaldırma K-02 açık. Vault sunucuda durdurulmuş; `config/databases.yaml` düz metin. F0-03 ile birleştirildi (tekrar eden satır). |
+| F6-02 | 🔄 Secrets yönetimi — Vault | Yüksek | 🔄 Dev modda tamamlandı; prod kurulumu ve düz metin kaldırma K-02 açık. Vault sunucuda durdurulmuş (2026-11-14 itibarıyla, `facts.json` `vault_running: 0`; bugün doğrulanamadı); `config/databases.yaml` düz metin. F0-03 ile birleştirildi (tekrar eden satır). |
 | F6-03 | Grafana dashboard JSON | Orta | ⬜ Deferred |
 | F6-04 | ✅ Prometheus alert rules | Orta | ✅ Tamamlandı (6 alert rule, Alertmanager UP). Kurallar değere göre ve pencereli (`last_over_time(...[70m])`, `absent_over_time`); PR #11 (MERGED), `config/prometheus/rules/dwh-health.yml` |
 | F6-05 | Horizontal scaling — Redis koordinasyon | Düşük | ⬜ Yapılmadı |
@@ -103,12 +103,12 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | # | Karar | Durum | Not |
 |---|---|---|---|
 | K-01 | APScheduler mi, Celery mi? | ✅ APScheduler | Seçildi, çalışıyor |
-| K-02 | Secrets yönetimi | ⬜ Açık | Düz metin. PR #5 (`${ENV}` açma) taslak; Vault dev modda, sunucuda durdurulmuş |
+| K-02 | Secrets yönetimi | ⬜ Açık | Düz metin. PR #5 (`${ENV}` açma) DRAFT (2026-11-24, `gh pr list`); Vault dev modda, sunucuda durdurulmuş (2026-11-14 itibarıyla) |
 | K-03 | Oracle AWR/ASH lisansı | ✅ Yok | Sadece V$/DBA_* kullanılıyor |
 | K-04 | MySQL edition | ✅ Community | INFORMATION_SCHEMA + performance_schema |
 | K-05 | Teradata BRD | ⬜ Açık | Rakip analizi sonrası |
 | K-06 | Cold storage backend | ⬜ Açık | S3, Azure Blob, yerel |
-| K-07 | /metrics endpoint auth | 🔄 API Key | PR #6 (MERGED). `API_KEY` tanımlıysa `X-API-Key` zorunlu (`api/auth.py`). Prometheus scrape (`config/prometheus/prometheus.yml`, job `dwh-metrics`) başlık göndermiyor; `API_KEY` tanımlıysa scrape 401 alır (sunucudaki `API_KEY` durumu doğrulanmadı). Bearer JWT / IP whitelist yapılmadı |
+| K-07 | /metrics endpoint auth | 🔄 API Key | PR #6 (MERGED). `API_KEY` tanımlıysa `X-API-Key` zorunlu (`api/auth.py`). Prometheus scrape (`config/prometheus/prometheus.yml`, job `dwh-metrics`) başlık göndermiyor (2026-11-24 kod kontrolü: job'da header/authorization tanımı yok); `API_KEY` tanımlıysa scrape 401 alır (sunucudaki `API_KEY` durumu doğrulanmadı). Bearer JWT / IP whitelist yapılmadı |
 
 ---
 
@@ -122,19 +122,21 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | #8 | `feat/helm-chart` | Helm chart (F6-01) | DRAFT. `helm lint/template` çalıştırılmadı |
 | #15 | `chore/agent-scope-layer` | Alt ajanlar için kapsam koruyucusu | DRAFT |
 
-Birleşenler (main'de): #1, #4, #6, #7, #9, #10, #11, #12, #13, #14.
+Birleşenler (main'de, 2026-11-24 `gh pr list --state all`): #1, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16.
 
 ---
 
 ## Sonraki oturumda yapılacaklar
 
-1. Açık taslak PR'ları sırayla incele, staging'de test et ve birleştir: #2, #3, #5, #8, #15
+1. Açık taslak PR'ları sırayla incele, staging'de test et ve birleştir: #2, #3, #5, #8, #15 (2026-11-24 itibarıyla hepsi DRAFT). PR #15 için ikinci bağımsız doğrulama tamamlanmadı; taslak kalıyor.
 2. Sunucuda PR #5 sonrası düz metin şifreleri `.env`'e taşı (image yeniden build gerekir)
-3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (dev konteyner sunucuda durdurulmuş, `postgres-local` sırrı eski)
+3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (2026-11-14 itibarıyla dev konteyner sunucuda durdurulmuş; bugün doğrulanamadı)
 4. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini gerçek değerle değiştir (DBA işi) ve adapter'ları `enabled: true` yap
 5. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula. `pg_dump` + `config/` gece yedeğine eklendi (2026-11-12). Restic cron 04:30; son başarılı çalışma 2026-11-14 04:33 (snapshot fcace2e3, depo 24G), kaynak `.claude/findings/facts.json` (2026-11-14 tarihli; sonraki günler sunucudan doğrulanmalı)
 6. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle
 7. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik)
+8. Alertmanager alıcı kararı: `config/alertmanager.yml` 16. satır `localhost:5001`; compose'da bu portu dinleyen servis yok (kod kontrolü 2026-11-24)
+9. `dwh-monitor` imajı yeniden build ve sunucu dağıtımı: 2026-11-14 kaydına göre imaj 2026-11-09 tarihli; F08–F13 düzeltmelerini içerip içermediği doğrulanamadı
 
 ---
 
@@ -163,8 +165,9 @@ Birleşenler (main'de): #1, #4, #6, #7, #9, #10, #11, #12, #13, #14.
 
 | Tarih | Görev | Detay |
 |---|---|---|
-| 2026-08-16 | GitHub README.md | 389 satır, kapsamlı proje dokümantasyonu, commit e7a1183 |
+| 2026-08-26 | GitHub README.md | 389 satır (o commit), kapsamlı proje dokümantasyonu, commit e7a1183 (commit tarihi `git log`; önceki 08-16 kaydı hatalıydı) |
 | 2026-11-09 | CI (F0-05) | PR #7: ruff, py_compile + pytest, docker build |
+| 2026-11-24 | Doküman durum güncellemesi | PR #10 (`1301be4`), PR #16 (`12402de`) birleşti; 6 md dosyası origin/main 12402de'ye göre güncellendi |
 | 2026-11-09 | `GET /logs` ve API anahtarı (F3-04, F3-07) | PR #6 |
 | 2026-11-08..09 | Sunucu ↔ GitHub senkronu, güvenlik düzeltmeleri | PR #1: sabit şifre varsayılanları kaldırıldı, portlar 127.0.0.1'e bağlandı |
 | 2026-11-09 | Md çelişkileri giderildi | PR #4 |

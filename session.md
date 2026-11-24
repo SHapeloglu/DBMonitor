@@ -3,33 +3,35 @@
 > Sıra: en yeni oturum en üstte. 11. ve 12. oturumlardaki "Sonraki" listeleri o günün durumudur; güncel liste `task.md`'dedir.
 > Not: numaralar 2026-08 kayıtlarında çakışıyordu; ayırt için harf eklendi (11a, 11b, 12a, 12b).
 
-## Oturum 14 — Kapsam katmanı, PR birleştirme, sunucu nginx kısıtlaması, md denetimi (2026-11-13..19)
+## Oturum 14 — Kapsam katmanı, PR birleştirme, sunucu nginx kısıtlaması, md denetimi (2026-11-13..24)
 
 ### Yapılanlar
 1. PR birleştirmeleri (2026-11-13, `gh pr list` ile MERGED): #13 (CI pytest adımı: httpx, DB_PASS, `python -m`), #14 (collector: düşen DB izi, persist durumu, açılış toplaması, kilit; F08–F13), #11 (alarm kuralları değere göre ve zaman damgasına uygun; F02–F04), #12 (compose: doğru DB adı, oracledb bağımlılığı, parolasız roller; F06, F07, F20), #9 (kullanıcı `dquser` → `apache`).
 2. Kapsam katmanı (alt ajanlar için) `chore/agent-scope-layer` dalında 3 commit: `bccc475` (hook, kapsam denetimi, sözleşme örneği), `00d66a3` (alt ajan deny, kanıt denetimi, tur sayacı), `7e3153b` (satır sonu ayırıcı açığı ve tur sayacı atomikliği). PR #15 taslak olarak açık.
 3. Sunucu nginx: DWH bloğunda satır 8 `return 403;` (`.claude/findings/facts.json`, 2026-11-14 tarihli). `nginx -t` sonucu alınamadı.
 4. Sunucu yedekleri (facts.json, 2026-11-14 tarihli): restic çalışması OK (2026-11-14 04:33:12, snapshot `fcace2e3`, depo 24G), restic cron uyarısı 0. `pg_dump` dosyaları 11-12, 11-13 ve 11-14 (04:30) için mevcut.
-5. md denetimi, doküman commit'leri (doğrulanmadı): `CLAUDE.md` `7e33481` (`agent/doc-claude`), `architect.md` `a8cc893` (`agent/doc-architect`), `README.md` `e0a25eb` (`agent/doc-readme`), `backlog.md` `5012d4a` (`agent/doc-backlog`). Bu commit'ler origin/main'de yok.
+5. md denetimi, doküman commit'leri (doğrulanmadı): `CLAUDE.md` `7e33481` (`agent/doc-claude`), `architect.md` `a8cc893` (`agent/doc-architect`), `README.md` `e0a25eb` (`agent/doc-readme`), `backlog.md` `5012d4a` (`agent/doc-backlog`). Bu commit'ler origin/main'de yok (2026-11-24, `git merge-base --is-ancestor`).
+   Not (2026-11-24): İçerikler origin/main'e farklı hash'lerle girdi: `cede537` (CLAUDE), `401e313` (architect), `928eab6` (README), `9f54572` (backlog); `3db0739`, `429e128`, `1682956` (session/task düzeltmeleri). Hepsi PR #10 (`1301be4`) ile birleşti.
 6. `task.md` düzeltmesi (`249b05b`) doküman dalına alındı (`docs/update-md-status`'ta `1682956`).
-7. PR #10 (doküman) birleştirildi (1301be4, 2026-11-24).
+7. PR #10 (doküman) birleştirildi (1301be4, 2026-11-24). PR #16 (`agent/doc-status`, `9507217`) birleştirildi (merge `12402de`, 2026-11-24).
+8. Doküman doğrulama turu (2026-11-24): session, architect, backlog, README (örnek parola ve Vault bölümü), task ve CLAUDE, origin/main 12402de'ye göre kontrol edildi. Doğrulanamayan maddeler etiketli bırakıldı (`config/databases.yaml` okunamadı; sunucu durumu 2026-11-14 kaydı).
+9. PR #15 (`chore/agent-scope-layer`, `bccc475`, `00d66a3`, `7e3153b`) DRAFT olarak kalır. İkinci bağımsız doğrulama tamamlanmadı; commit'ler origin/main'de yok (2026-11-24).
 
-### Açık kalanlar
-- Alertmanager webhook adresi: `config/alertmanager.yml` 16. satır `http://localhost:5001/alerts`. Compose'da 5001'i dinleyen servis yok; gerçek alıcı tanımlı değil. Karar bekliyor.
-- Sunucu dağıtımı: `dwh-monitor` imajı yeniden build edilecek ve yerel değişiklikler sunucuya alınacak. Onay bekliyor. İmaj 2026-11-09 tarihli; F08–F13 düzeltmelerini içerip içermediği doğrulanmadı.
-- Vault konteyneri çalışmıyor (facts.json `vault_running: 0`); monitor çalışma zamanında Vault'tan okumuyor.
-- Sunucu diski %85 dolu (30G boş).
-- F05: `API_KEY` ve Prometheus başlığı kararı açık.
-- PR #5 (düz metin parola konusu): açık karar. Oturum 13 kaydına göre düz metin parolalar repoda ve sunucuda vardı; güncel durum doğrulanmadı.
-- Kapsam katmanı PR #15: ikinci bağımsız doğrulama bekliyor.
-- md doküman commit'leri (`7e33481`, `a8cc893`, `e0a25eb`, `5012d4a`) main'e alınmadı; doğrulanmadı.
-- Yerel `main` ref'i origin/main'in gerisinde (yerel son commit `f53b1ad`, origin/main son commit `e8f3f10`). PR birleşmeleri origin/main'de doğrulandı.
-- Taslak PR'lar: #2, #3, #5, #8, #15.
+### Açık kalanlar (2026-11-24 durumu; sunucu maddeleri 2026-11-14 kaydıdır)
+- Alertmanager webhook adresi: `config/alertmanager.yml` 16. satır `http://localhost:5001/alerts` (kod kontrolü 2026-11-24). Compose'da 5001'i dinleyen servis yok; gerçek alıcı tanımlı değil. Karar bekliyor.
+- Sunucu dağıtımı: `dwh-monitor` imajı yeniden build edilecek ve yerel değişiklikler sunucuya alınacak. Onay bekliyor. İmaj 2026-11-09 tarihli; F08–F13 düzeltmelerini içerip içermediği doğrulanamadı (2026-11-14 itibarıyla, doğrulanamadı).
+- Vault konteyneri çalışmıyor (2026-11-14 itibarıyla, facts.json `vault_running: 0`; doğrulanamadı); monitor çalışma zamanında Vault'tan okumuyor (kod kontrolü 2026-11-24).
+- Sunucu diski %85 dolu (30G boş) (2026-11-14 itibarıyla; doğrulanamadı).
+- F05: `API_KEY` ve Prometheus başlığı kararı açık (kod kontrolü 2026-11-24: `config/prometheus/prometheus.yml` `dwh-metrics` job'ında başlık yok).
+- PR #5 (düz metin parola konusu): DRAFT, açık karar. Oturum 13 kaydına göre düz metin kimlik bilgileri repoda ve sunucuda vardı; sunucudaki güncel durum doğrulanamadı.
+- Kapsam katmanı PR #15: DRAFT; ikinci bağımsız doğrulama bekliyor.
+- Taslak PR'lar (2026-11-24, `gh pr list`): #2, #3, #5, #8, #15.
+- PR birleşmeleri origin/main'de doğrulandı (2026-11-24).
 
 ### Sonraki
 - Kapsam katmanı PR #15 için ikinci bağımsız doğrulama.
-- md commit'lerinin ve `task.md` düzeltmesinin main'e alınma kararı.
 - Sunucu dağıtım onayı ve Alertmanager alıcı kararı.
+- Vault kararı (K-02) ve PR #5 sonrası `.env` geçişi.
 - Bkz. `task.md` "Sonraki oturumda yapılacaklar".
 
 ---
@@ -181,6 +183,7 @@ Production'da şifreler düz text'te, Git repo'ya push olabiliyor.
 - Kapsamlı GitHub README.md oluşturuldu (14.8 KB, 389 satır)
 - Base64 yöntemiyle sunucuya yazıldı (backtick/heredoc çakışması nedeniyle)
 - Commit: e7a1183 → main
+- Not (2026-11-24): commit e7a1183 tarihi `git log`'da 2026-08-26; önceki kayıtlardaki 2026-08-16 tarihi hatalıdır (CLAUDE.md ve task.md düzeltildi).
 
 ### README İçeriği
 - Badges, architecture diagram (ASCII), features, health check categories

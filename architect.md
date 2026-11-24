@@ -1,6 +1,6 @@
 # DWH İzleme Sistemi — Mimari
 
-Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-14). Main'e birleşenler: PR #1, #4, #6, #7, #9, #10, #11, #12, #13, #14. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #15) "Bekleyen" olarak işaretlidir.
+Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-24, `origin/main` 12402de). Main'e birleşenler: PR #1, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #15; 2026-11-24 itibarıyla hepsi DRAFT) "Bekleyen" olarak işaretlidir.
 
 ## 1. Amaç
 
@@ -63,21 +63,23 @@ Sonuç değerleri: `OK`, `WARNING`, `ERROR`. Severity 1–3. **Bekleyen (PR #3):
 
 ## 6. Yapılandırma
 
-`config/` altında: `databases.yaml`, `notifications.yaml`, `retention.yaml`, `alertmanager.yml`, `prometheus/prometheus.yml`, `prometheus/rules/dwh-health.yml` (6 alarm kuralı: `DWHCriticalHealthIssue`, `DWHSecurityThreat`, `DWHPipelineBreakdown`, `DWHWarningIssue`, `DWHMultipleCategoriesCritical`, `DWHAllAdaptersDown`). Kurallar PR #11 ile örnek değerine göre yazıldı (OK=0, WARNING=2, ERROR=3) ve pencerelidir: `last_over_time(dwh_health_check[70m])`; `DWHAllAdaptersDown` `absent_over_time(dwh_health_check[2h])` kullanır. Pencereler saatlik `COLLECT_CRON` varsayılanına göre seçilmiştir; cron değişirse ayarlanmalıdır. Metrikte `severity` etiketi yoktur (`severity` yalnızca alarm etiketidir). Açıklamalı örnekler `docs/config/` altındadır.
+`config/` altında: `databases.yaml`, `notifications.yaml`, `retention.yaml`, `alertmanager.yml`, `prometheus/prometheus.yml`, `prometheus/rules/dwh-health.yml` (6 alarm kuralı: `DWHCriticalHealthIssue`, `DWHSecurityThreat`, `DWHPipelineBreakdown`, `DWHWarningIssue`, `DWHMultipleCategoriesCritical`, `DWHAllAdaptersDown`). Kurallar PR #11 ile örnek değerine göre yazıldı (OK=0, WARNING=2, ERROR=3) ve pencerelidir: `last_over_time(dwh_health_check[70m])`; `DWHAllAdaptersDown` `absent_over_time(dwh_health_check[2h])` veya `up{job="dwh-metrics"} == 0` kullanır (`config/prometheus/rules/dwh-health.yml`, 2026-11-24). Pencereler saatlik `COLLECT_CRON` varsayılanına göre seçilmiştir; cron değişirse ayarlanmalıdır. Metrikte `severity` etiketi yoktur (`severity` yalnızca alarm etiketidir). Açıklamalı örnekler `docs/config/` altındadır.
 
 Monitor'ün kendi log DB bağlantısı ortam değişkenlerinden gelir: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`. `DB_PASS` zorunludur, kodda varsayılan şifre yoktur.
 
-**Bekleyen (PR #5):** YAML yükleyicileri `${NAME}` ortam değişkenlerini açar; böylece `databases.yaml`'daki şifreler `.env`'e taşınır. Değişiklik uyumsuzdur: dağıtımda 8 değişkenin tanımlı olması gerekir.
+**Bekleyen (PR #5):** YAML yükleyicileri `${NAME}` ortam değişkenlerini açar; böylece `databases.yaml`'daki kimlik bilgileri `.env`'e taşınır. Değişiklik uyumsuzdur: dağıtımda 8 değişkenin tanımlı olması gerekir. (2026-11-24: `origin/main` Python dosyalarında `expandvars` yok; PR #5 birleşmedi.)
 
 ## 7. Dağıtım
 
-`docker-compose.yml` servisleri: `postgres` (container `dq-postgres`, host portu 127.0.0.1:5433), `dwh-monitor` (127.0.0.1:8005), `prometheus` (9090), `alertmanager` (9093), `vault` (8200, dev). Tüm portlar yalnızca 127.0.0.1'e bağlıdır. `DQ_DB_PASSWORD` `.env`'den zorunlu okunur.
+`docker-compose.yml` servisleri: `postgres` (container `dq-postgres`, host portu 127.0.0.1:5433), `dwh-monitor` (127.0.0.1:8005), `prometheus` (9090), `alertmanager` (9093), `vault` (8200, dev). Tüm portlar yalnızca 127.0.0.1'e bağlıdır. `DQ_DB_PASSWORD` `.env`'den zorunlu okunur (compose'da `:?` ile; 2026-11-14 `facts.json` kaydı).
 
 DB kullanıcısı `apache` (PR #9 main'de; `api/main.py` varsayılanı `apache`).
 
 **Bekleyen:** Helm chart (PR #8, F6-01, taslak).
 
-Sunucuda nginx yalnızca `/health` yolunu dışarıya açar; diğer yollar 403 döner (`return 403;`). `nginx -t` doğrulanamadı (DOĞRULANAMADI).
+Sunucuda nginx yalnızca `/health` yolunu dışarıya açar; diğer yollar 403 döner (`return 403;`) (2026-11-14 itibarıyla, `facts.json`; bugün doğrulanamadı). `nginx -t` sonucu alınamadı (DOĞRULANAMADI).
+
+Alertmanager alıcısı: `config/alertmanager.yml` 16. satır `http://localhost:5001/alerts`. Compose dosyasında 5001 portunu kullanan servis yok (2026-11-24, kod kontrolü); gerçek alıcı tanımlı değil, karar bekliyor.
 
 CI: `.github/workflows/ci.yml` — ruff, py_compile + pytest, docker build (PR'larda ve main'e push'ta).
 
@@ -85,11 +87,11 @@ CI: `.github/workflows/ci.yml` — ruff, py_compile + pytest, docker build (PR'l
 
 Kod tarafı: `adapter_registry._resolve_credentials()` `credentials: vault://db/<ad>` değerini hvac ile Vault KV v2'den (`secret/data/db/*`) çözer (`core/adapter_registry.py`); Vault erişilemezse kimlik bilgileri olduğu gibi kalır. İki biçim desteklenir: tüm sözlük (`vault://db/ad`) veya tek alan (`password: vault://db/ad`). `scripts/vault-init.py` policy ve kimlik bilgilerini yükler.
 
-Gerçek durum: Vault **dev modunda** (bellek içi, her açılışta rastgele token, veri kaybolur). `config/databases.yaml`'da `vault://` referansı yoktur, kimlik bilgileri düz metindir; monitor çalışma zamanında Vault'tan okumaz. Sunucuda Vault konteyneri durdurulmuştur. Üretim için sealed mod, kalıcı backend (file/Raft), servis hesabı token'ı ve audit log gerekir (K-02 açık).
+Gerçek durum: Vault **dev modunda** (bellek içi, her açılışta rastgele token, veri kaybolur). `config/databases.yaml`'da `vault://` referansı yoktur, kimlik bilgileri düz metindir; monitor çalışma zamanında Vault'tan okumaz. 2026-11-14 itibarıyla sunucuda Vault konteyneri çalışmıyordu (`facts.json`, `vault_running: 0`; bugün doğrulanamadı). Üretim için sealed mod, kalıcı backend (file/Raft), servis hesabı token'ı ve audit log gerekir (K-02 açık).
 
 ## 9. Saklama
 
-`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık; bu iki backend yalnızca log yazar, `core/retention_manager.py` içinde "henüz tam implemente edilmedi" — arşivleme yapılmaz), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır. Bu düzeltme PR #2'de (taslak), main'de hâlâ eski kod vardır.
+`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık; bu iki backend yalnızca log yazar, `core/retention_manager.py` içinde "henüz tam implemente edilmedi" — arşivleme yapılmaz), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır. Bu düzeltme PR #2'de (taslak), main'de hâlâ eski kod vardır: `_archive_old_rows` (122. satır) ve `_delete_old_rows` (175. satır) ayrı sorgular olarak çalışır (2026-11-24, `core/retention_manager.py`).
 
 ## 10. Dokümantasyon
 

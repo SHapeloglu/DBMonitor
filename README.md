@@ -1,6 +1,6 @@
 # DWH DB Monitor
 
-> Çok veritabanlı Veri Ambarı sağlık izleme platformu (prod: tek sunucuda Docker Compose; bkz. açık riskler)
+> Çok veritabanlı Veri Ambarı sağlık izleme platformu (prod: tek sunucuda Docker Compose; açık kararlar için bkz. `task.md`)
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
@@ -9,7 +9,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docker.com)
 Lisans: henüz belirlenmedi
 
-DWH DB Monitor, Veri Ambarı veritabanlarınızın kalitesini, maliyetini, pipeline bütünlüğünü, güvenliğini ve kullanıcı davranışını sürekli kontrol eden eklenti tabanlı bir sağlık izleme platformudur. PostgreSQL, MSSQL, MySQL, MariaDB, Oracle ve ODBC uyumlu her veritabanını kutudan çıktığı gibi destekler — yeni bir veritabanı eklemek kabaca 150 satır Python ve 3 satır YAML gerektirir.
+DWH DB Monitor, Veri Ambarı veritabanlarınızın kalitesini, maliyetini, pipeline bütünlüğünü, güvenliğini ve kullanıcı davranışını sürekli kontrol eden eklenti tabanlı bir sağlık izleme platformudur. PostgreSQL, MSSQL, MySQL, MariaDB, Oracle ve genel ODBC kaynakları için adaptör içerir (PostgreSQL dışındakiler henüz gerçek bağlantı bilgileriyle etkinleştirilmedi) — yeni bir veritabanı eklemek kabaca 150 satır Python ve 3 satır YAML gerektirir.
 
 ---
 
@@ -75,9 +75,9 @@ DWH DB Monitor, Veri Ambarı veritabanlarınızın kalitesini, maliyetini, pipel
 - **5 kontrol kategorisi** — Maliyet, Veri Kalitesi, Pipeline, Kullanıcı Davranışı, Güvenlik
 - **Bağımsız Notifier** — SMTP, Slack, PagerDuty, Teams, genel webhook; DB'ye özgü stored procedure yok
 - **Merkezi RetentionManager** — 24 ay aktif saklama + soğuk arşiv (yerel; S3 / Azure Blob planlandı, henüz uygulanmadı)
-- **Circuit breaker** — adaptör başına hata yalıtımı; ardışık 3 hata devreyi açar
+- **Circuit breaker** — adaptör başına hata yalıtımı; ardışık 3 hata devreyi açar, 300 sn bekler
 - **Prometheus + Alertmanager** — hazır 6 alarm kuralı (kritik, güvenlik, pipeline, uyarı, kriz, tüm adaptörler kapalı)
-- **HashiCorp Vault** — `vault://` URI formatıyla kimlik bilgisi çözümleme
+- **HashiCorp Vault (isteğe bağlı)** — `vault://` URI ile kimlik bilgisi çözümleme; düz metin kimlik bilgisi de kabul edilir (K-02 açık)
 
 ---
 
@@ -113,7 +113,7 @@ cd DBMonitor
 
 ```bash
 cp docs/config/databases.yaml config/databases.yaml
-# UYARI: Parolaları düz metin girmeyin; mümkünse vault:// referansı kullanın (bkz. Vault bölümü). config/ dosyaları git'e eklenmemeli.
+# UYARI: Parolaları düz metin girmeyin; mümkünse vault:// referansı kullanın (bkz. Vault bölümü). config/ dosyaları git'e eklenmemeli (şu an `config/databases.yaml` git'te izleniyor; PR #5 bekliyor).
 # config/databases.yaml dosyasını düzenle:
 #   - veritabanın için host, port, db_name ve kimlik bilgilerini gir
 #   - etkin olmasını istediğin adaptörlerde enabled: true yap
@@ -216,8 +216,8 @@ notifications:
 |----------|--------|-------------|
 | `/health` | GET | Adaptör durumu ve engine sağlığı (kimlik doğrulama yok) |
 | `/metrics` | GET | Prometheus exposition formatı |
-| `/collect` | GET | Toplamayı elle tetikler |
-| `/logs` | GET | Filtreli JSON liste: `db_name`, `kontrol_kodu`, `sonuc`, `severity`, `since`, `until`, `limit` (≤1000), `offset` |
+| `/collect` | GET | Toplamayı elle tetikler (toplama zaten sürüyorsa HTTP 409) |
+| `/logs` | GET | Filtreli JSON liste: `db_name`, `kontrol_kodu`, `sonuc`, `severity`, `since`, `until`, `limit` (varsayılan 100, en çok 1000), `offset` |
 | `/logs/summary` | GET | Kategori bazlı özet |
 | `/adapters` | GET | Adaptörlerin circuit breaker durumu |
 
@@ -247,7 +247,7 @@ Hazır 6 Prometheus alarm kuralı:
 | `DWHMultipleCategoriesCritical` | 3'ten fazla kategoride değer 3 (pencereli, 70m) | 10m | critical |
 | `DWHAllAdaptersDown` | `absent_over_time(dwh_health_check[2h])` veya scrape hedefi düşük | 5m | critical |
 
-Alıcıları `config/alertmanager.yml` içinde yapılandır.
+Alıcıları `config/alertmanager.yml` içinde yapılandır. Şu an 16. satırdaki alıcı `http://localhost:5001/alerts` olup compose'da bu portu dinleyen servis yok; gerçek alıcı karar bekliyor (2026-11-24).
 
 ---
 
@@ -276,7 +276,7 @@ CREATE TABLE monitor.dwh_health_log (
 ) PARTITION BY RANGE (kontrol_tarihi);
 ```
 
-- **24 aylık bölüm** (2025-01'den 2026-12'ye); 2027 bölümleri retention işiyle eklenir; 2027 sınırı için bkz. task.md
+- **24 aylık bölüm** (2025-01'den 2026-12'ye); 2027 bölümleri retention işiyle eklenir; bkz. `task.md` F0-02
 - Panel ve alarm sorguları için optimize edilmiş **5 index**
 - **3 view:** `v_son_24s_ozet`, `v_aktif_sorunlar`, `v_trend_7gun`
 - **Arşiv tablosu:** 24 aydan eski satırlar için `dwh_health_log_archive`
@@ -345,12 +345,16 @@ Engine kodunda değişiklik yok. Yeni adaptör AdapterRegistry üzerinden otomat
 
 ## Vault Entegrasyonu
 
-Kimlik bilgileri `vault://` URI formatıyla HashiCorp Vault'ta saklanabilir:
+Kimlik bilgileri HashiCorp Vault'tan (KV v2, `secret/data/db/<ad>`) `vault://` URI ile çözülebilir. Düz metin kimlik bilgisi de desteklenir; bu K-02 kapsamında açık bir konudur.
 
 ```yaml
+# tüm kimlik bilgisi sözlüğü Vault'tan:
+credentials: vault://db/<ad>
+
+# veya alan bazında:
 credentials:
   user: etl_svc
-  password: <ETL_SVC_PAROLASI>
+  password: vault://db/<ad>
 ```
 
 Vault konteyneri yeniden başladıktan sonra (dev modu):
@@ -368,7 +372,7 @@ docker compose restart dwh-monitor
 RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çalışır:
 
 - **Aktif:** `dwh_health_log` içinde 24 ay
-- **Arşiv:** 24 aydan eski satırlar `dwh_health_log_archive`'a taşınır
+- **Arşiv:** 24 aydan eski satırlar `dwh_health_log_archive`'a kopyalanır, ardından aktif tablodan silinir (iki ayrı sorgu; tek ifadeli sürüm PR #2'de, taslak)
 - **Backend'ler:** yerel dosya sistemi (varsayılan); S3 ve Azure Blob planlandı (henüz uygulanmadı)
 
 ---
@@ -379,10 +383,10 @@ RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çal
 |--------|-------------|--------|
 | F0 | Altyapı - DDL, Docker, ön kontrol | Bitti |
 | F0-05 | CI - GitHub Actions (ruff, pytest, docker build) | Bitti |
-| F1 | Çekirdek engine - registry, scheduler, notifier, retention | Bitti |
+| F1 | Çekirdek engine - registry, scheduler, notifier, retention | Kısmi (retention yalnızca yerel arşiv; F1-06) |
 | F2 | PostgreSQL adaptörü (referans uygulama) | Bitti |
 | F3 | API katmanı - /health, /metrics, /logs, /adapters, API anahtarı | Bitti |
-| F4 | MSSQL adaptörü - 8 FR kontrolü, ODBC Driver 18 | Bitti, kimlik bilgisi bekleniyor |
+| F4 | MSSQL adaptörü - 8 FR kontrolü, ODBC Driver 18 | Bitti, kimlik bilgisi bekleniyor; mantık düzeltmeleri PR #3 (taslak) |
 | F5 | MySQL, MariaDB, Oracle, Genel ODBC adaptörleri | Bitti, kimlik bilgisi bekleniyor |
 | F6-02 | HashiCorp Vault entegrasyonu | Kısmi: dev modda; K-02 açık (düz metin) |
 | F6-04 | Prometheus alarm kuralları (6 kural) + Alertmanager | Bitti (kurallar PR #11 ile düzeltildi) |
