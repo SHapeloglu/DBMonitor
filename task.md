@@ -120,16 +120,15 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | DRAFT. Gerçek MSSQL ile test gerekli |
 | #5 | `chore/config-secrets-env` | YAML'da `${NAME}` açma, şifreleri `.env`'e taşıma | DRAFT. Uyumsuz: 8 ortam değişkeni zorunlu; sunucuda image yeniden build gerekir |
 | #8 | `feat/helm-chart` | Helm chart (F6-01) | DRAFT. `helm lint/template` çalıştırılmadı |
-| #10 | `docs/update-md-status` | md dosyaları main'deki duruma göre güncellendi | DRAFT |
 | #15 | `chore/agent-scope-layer` | Alt ajanlar için kapsam koruyucusu | DRAFT |
 
-Birleşenler (main'de): #1, #4, #6, #7, #9, #11, #12, #13, #14.
+Birleşenler (main'de): #1, #4, #6, #7, #9, #10, #11, #12, #13, #14.
 
 ---
 
 ## Sonraki oturumda yapılacaklar
 
-1. Açık taslak PR'ları sırayla incele, staging'de test et ve birleştir: #2, #3, #5, #8, #10, #15
+1. Açık taslak PR'ları sırayla incele, staging'de test et ve birleştir: #2, #3, #5, #8, #15
 2. Sunucuda PR #5 sonrası düz metin şifreleri `.env`'e taşı (image yeniden build gerekir)
 3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (dev konteyner sunucuda durdurulmuş, `postgres-local` sırrı eski)
 4. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini gerçek değerle değiştir (DBA işi) ve adapter'ları `enabled: true` yap

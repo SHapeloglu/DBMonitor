@@ -11,7 +11,7 @@
 
 ## Güncel durum (2026-11-14)
 - main: PR #1, #4, #6, #7, #9, #11, #12, #13, #14 birleşti. Faz 0–5 bitti; F0-05, F3-04, F3-07 bitti.
-- Açık taslak PR'lar: #2 retention, #3 MSSQL, #5 `${ENV}` açma (uyumsuz), #8 Helm, #10 md güncelleme, #15 ajan kapsam koruyucusu. Ayrıntı: `task.md`.
+- Açık taslak PR'lar: #2 retention, #3 MSSQL, #5 `${ENV}` açma (uyumsuz), #8 Helm, #15 ajan kapsam koruyucusu. Ayrıntı: `task.md`.
 - Sunucuda DB kullanıcısı `apache`, şifre döndürülmüş; main'de `DB_USER` varsayılanı `apache` (PR #9 birleşti).
 - Adapter'lar (PostgreSQL hariç) `enabled: false`; uzak DB şifreleri placeholder.
 
