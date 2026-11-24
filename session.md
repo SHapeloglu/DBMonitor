@@ -11,7 +11,7 @@
 3. Sunucu nginx: DWH bloğunda satır 8 `return 403;` (`.claude/findings/facts.json`, 2026-11-14 tarihli). `nginx -t` sonucu alınamadı.
 4. Sunucu yedekleri (facts.json, 2026-11-14 tarihli): restic çalışması OK (2026-11-14 04:33:12, snapshot `fcace2e3`, depo 24G), restic cron uyarısı 0. `pg_dump` dosyaları 11-12, 11-13 ve 11-14 (04:30) için mevcut.
 5. md denetimi, doküman commit'leri (doğrulanmadı): `CLAUDE.md` `7e33481` (`agent/doc-claude`), `architect.md` `a8cc893` (`agent/doc-architect`), `README.md` `e0a25eb` (`agent/doc-readme`), `backlog.md` `5012d4a` (`agent/doc-backlog`). Bu commit'ler origin/main'de yok.
-6. `task.md` düzeltmesi: `agent/doc-task` dalında yeni bir düzeltme commit'i görünmüyor; son `task.md` değişikliği `fea8308` (eski). Bekliyor.
+6. `task.md` düzeltmesi (`249b05b`) doküman dalına alındı (`docs/update-md-status`'ta `1682956`).
 
 ### Açık kalanlar
 - Alertmanager webhook adresi: `config/alertmanager.yml` 16. satır `http://localhost:5001/alerts`. Compose'da 5001'i dinleyen servis yok; gerçek alıcı tanımlı değil. Karar bekliyor.

@@ -167,7 +167,7 @@ databases:
     enabled: true
     credentials:
       user: apache
-      password: <parola>        # veya: vault://db/postgres-local
+      password: <APACHE_PAROLASI>        # veya: vault://db/postgres-local
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
@@ -178,7 +178,7 @@ databases:
     enabled: false             # kimlik bilgilerini girdikten sonra true yap
     credentials:
       user: etl_svc
-      password: changeme
+      password: <ETL_SVC_PAROLASI>
 ```
 
 ### notifications.yaml
@@ -318,7 +318,7 @@ class TeradataAdapter(DBAdapter):
     enabled: true
     credentials:
       user: etl_svc
-      password: changeme
+      password: <ETL_SVC_PAROLASI>
 ```
 
 ### Adım 3 - Yeniden başlat
@@ -350,7 +350,7 @@ Kimlik bilgileri `vault://` URI formatıyla HashiCorp Vault'ta saklanabilir:
 ```yaml
 credentials:
   user: etl_svc
-  password: vault://db/postgres-local
+  password: <ETL_SVC_PAROLASI>
 ```
 
 Vault konteyneri yeniden başladıktan sonra (dev modu):

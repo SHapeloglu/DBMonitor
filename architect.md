@@ -32,7 +32,7 @@ config/databases.yaml ──► AdapterRegistry ──► DBAdapter (5 platform)
 | Yükleyici | `core/adapter_registry.py` | YAML okur, adapter sınıfını `importlib` ile yükler, `vault://` referanslarını çözer |
 | Zamanlayıcı | `core/collector_engine.py` | Saatlik toplama (`COLLECT_CRON`, varsayılan `0 * * * *`), adapter başına circuit breaker (3 hata → 300 sn bekleme), sonuçları loga yazar. Bağlantı/sağlık hatası veren veya devresi açık DB için o tura ERROR metriği üretir (kategori `sistem`, `kontrol_kodu` `FR-SYS-01`, severity 3). Aynı anda tek tur: toplama kilidi alınamazsa scheduler turu atlar, elle istek `CollectionBusy` alır. Açılışta cron'u beklemeden bir toplama yapılır (PR #14) |
 | Bildirim | `core/notifier.py` | SMTP, Slack, PagerDuty, Teams, genel webhook; DB'ye bağımlı değil |
-| Saklama | `core/retention_manager.py` | 24 ay aktif saklama, eski satırları tek CTE ifadesiyle arşiv tablosuna taşır; `RETENTION_CRON` varsayılan `0 1 1 * *` |
+| Saklama | `core/retention_manager.py` | 24 ay aktif saklama, eski satırları arşiv tablosuna taşır. Bekleyen (PR #2): tek CTE ile taşır; main'de hâlâ eski DELETE kodu var; `RETENTION_CRON` varsayılan `0 1 1 * *` |
 | Adapter'lar | `adapters/*.py` | `postgresql` (8 FR), `mssql` (8 FR), `mysql` (MySQL + MariaDB), `oracle`, `generic_odbc` (3 FR) |
 | API | `api/main.py`, `api/logs.py`, `api/auth.py` | Aşağıda |
 

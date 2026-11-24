@@ -40,7 +40,7 @@ Kaynak: doğrulayıcı kararları (V1–V5), 2026-11-14. Bu F-kodları `task.md`
 - **F21** — Notifier eşikleri `eval` ile değerlendiriyor; boş `__builtins__` yeterli sandbox değil — düşük — CONFIRMED, açık.
 - **F22** — Dockerfile'da `USER` ve `HEALTHCHECK` yok (root çalışır), bağımlılıklar `>=` ile sabitlenmemiş, `vault:latest` — orta — CONFIRMED, açık.
 - **F23** — API özel `_open_connection` ve `CircuitBreaker` özel alanlarına kilitsiz erişiyor — düşük — CONFIRMED, açık.
-- **F25** — Varsayılan kullanıcı üç dosyada hâlâ `dquser` (PR #9 sonrası `apache` ile tutarsız) — düşük — CONFIRMED, açık.
+- **F25** — Varsayılan kullanıcı üç dosyada hâlâ `dquser` (PR #9 sonrası `apache` ile tutarsız) — düşük — CONFIRMED. ✅ kapandı: PR #9 ile birleşti (2026-11-13); `dquser` origin/main'de yok.
 - **F26** — `databases.yaml` iddiası: sır dosyası okunamadığından kanıt alınamadı — düşük — REJECTED (kanıtsız).
 - **F27** — Test kapsamı yalnızca `tests/test_api.py`; Notifier, CircuitBreaker, RetentionManager, AdapterRegistry testsiz — orta — CONFIRMED, açık.
 - **F28** — `ruff.toml` yalnızca 4 kural grubu seçiyor (F401/F841 yakalanmaz); CI `tests/` yoksa atlıyor — düşük — CONFIRMED, açık.
