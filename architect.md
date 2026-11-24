@@ -1,6 +1,6 @@
 # DWH İzleme Sistemi — Mimari
 
-Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-14). Main'e birleşenler: PR #1, #4, #6, #7, #9, #11, #12, #13, #14. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #10, #15) "Bekleyen" olarak işaretlidir.
+Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-14). Main'e birleşenler: PR #1, #4, #6, #7, #9, #10, #11, #12, #13, #14. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #15) "Bekleyen" olarak işaretlidir.
 
 ## 1. Amaç
 
