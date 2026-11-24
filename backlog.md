@@ -10,7 +10,7 @@ Fazlara bölünmüş planlı iş `task.md`'de (Faz 0–6, açık kararlar K-01�
 
 - **K-06 Cold storage**: eski ölçüm/log verisinin S3 / Azure Blob / yerel arşive taşınması ve saklama politikası.
 - **K-07 `/metrics` erişim koruması**: API key yapıldı (PR #6). Kalan: Bearer JWT / IP whitelist ve Prometheus scrape'e `X-API-Key` başlığı eklenmesi.
-- **K-02 Secrets**: Vault (F6-02) kodu hazır ama sunucuda vault konteyneri durdurulmuş (2026-11-14 itibarıyla çalışmıyor), düz metin fallback açık — prod modu (sealed, Raft/file backend, servis hesabı token'ı, audit log) ve fallback'in kapatılması.
+- **K-02 Secrets**: Vault (F6-02) kodu hazır ama sunucuda vault konteyneri durdurulmuş (2026-11-14 itibarıyla çalışmıyor; bugün doğrulanamadı), düz metin fallback açık — prod modu (sealed, Raft/file backend, servis hesabı token'ı, audit log) ve fallback'in kapatılması.
 
 ## Ertelenmiş üretim işleri
 
@@ -42,15 +42,16 @@ Kaynak: doğrulayıcı kararları (V1–V5), 2026-11-14. Bu F-kodları `task.md`
 - **F23** — API özel `_open_connection` ve `CircuitBreaker` özel alanlarına kilitsiz erişiyor — düşük — CONFIRMED, açık.
 - **F25** — Varsayılan kullanıcı üç dosyada hâlâ `dquser` (PR #9 sonrası `apache` ile tutarsız) — düşük — CONFIRMED. ✅ kapandı: PR #9 ile birleşti (2026-11-13); `dquser` origin/main'de yok.
 - **F26** — `databases.yaml` iddiası: sır dosyası okunamadığından kanıt alınamadı — düşük — REJECTED (kanıtsız).
-- **F27** — Test kapsamı yalnızca `tests/test_api.py`; Notifier, CircuitBreaker, RetentionManager, AdapterRegistry testsiz — orta — CONFIRMED, açık.
+- **F27** — Test kapsamı: `tests/test_api.py` ve `tests/test_collector_engine.py` (PR #14). Notifier ve AdapterRegistry hâlâ testsiz; CircuitBreaker doğrudan test edilmiyor; RetentionManager hiçbir testte geçmiyor; tests/test_collector_engine.py yalnızca FakeRetention kullanıyor (2026-11-24, `tests/` içeriği) — orta — CONFIRMED, kısmen açık.
 - **F28** — `ruff.toml` yalnızca 4 kural grubu seçiyor (F401/F841 yakalanmaz); CI `tests/` yoksa atlıyor — düşük — CONFIRMED, açık.
 
-PR'ı olan bulgular (bilgi için):
+PR'ı olan bulgular (bilgi için; durum 2026-11-24, `gh pr list`):
 
-- **F01** — PR #2 (açık, retention); **F24** — PR #2 (açık, ölü kod temizliği).
-- **F02, F03, F04** — PR #11 (birleşti).
-- **F06, F07, F20** — PR #12 (birleşti).
-- **F08, F09, F10, F11, F12, F13** — PR #14 (birleşti).
+- **F01** — PR #2 (DRAFT, retention); **F24** — PR #2 (DRAFT, ölü kod temizliği). Açık.
+- ✅ **F02, F03, F04** — PR #11 (MERGED).
+- ✅ **F06, F07, F20** — PR #12 (MERGED).
+- ✅ **F08, F09, F10, F11, F12, F13** — PR #14 (MERGED).
+- ✅ **F25** — PR #9 (MERGED, 2026-11-13).
 
 ## Ekleme Şablonu
 
