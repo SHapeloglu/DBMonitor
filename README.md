@@ -113,7 +113,7 @@ cd DBMonitor
 
 ```bash
 cp docs/config/databases.yaml config/databases.yaml
-# UYARI: Parolaları düz metin girmeyin; mümkünse vault:// referansı kullanın (bkz. Vault bölümü). config/ dosyaları git'e eklenmemeli (şu an `config/databases.yaml` git'te izleniyor; PR #5 bekliyor).
+# UYARI: `config/databases.yaml` ve `.env` git'e girmez (`.gitignore`). Kopyadaki değerler yer tutucudur; gerçek parolayı yalnızca yerel dosyada tutun. Mümkünse vault:// referansı kullanın (bkz. Vault bölümü).
 # config/databases.yaml dosyasını düzenle:
 #   - veritabanın için host, port, db_name ve kimlik bilgilerini gir
 #   - etkin olmasını istediğin adaptörlerde enabled: true yap
@@ -121,7 +121,7 @@ cp docs/config/databases.yaml config/databases.yaml
 
 ### 3. Ortam dosyasını oluştur
 
-`.env` dosyası oluşturun: `DQ_DB_PASSWORD=<güçlü parola>` (compose bu değişkeni zorunlu tutar; `.env` git'e girmez).
+`.env` dosyası oluşturun: `DQ_DB_PASSWORD=<güçlü parola>` ve `VAULT_TOKEN=<token>` (compose `DQ_DB_PASSWORD`'ü zorunlu tutar; `.env` git'e girmez, sunucuda mod 600 olmalı).
 
 ### 4. Başlat
 
@@ -247,7 +247,7 @@ Hazır 6 Prometheus alarm kuralı:
 | `DWHMultipleCategoriesCritical` | 3'ten fazla kategoride değer 3 (pencereli, 70m) | 10m | critical |
 | `DWHAllAdaptersDown` | `absent_over_time(dwh_health_check[2h])` veya scrape hedefi düşük | 5m | critical |
 
-Alıcıları `config/alertmanager.yml` içinde yapılandır. Şu an 16. satırdaki alıcı `http://localhost:5001/alerts` olup compose'da bu portu dinleyen servis yok; gerçek alıcı karar bekliyor (2026-11-24).
+Alıcıları `config/alertmanager.yml` içinde yapılandır. Şu an 16. satırdaki alıcı `http://localhost:5001/alerts` olup compose'da bu portu dinleyen servis yok; gerçek alıcı karar bekliyor (2026-11-25).
 
 ---
 
@@ -372,7 +372,7 @@ docker compose restart dwh-monitor
 RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çalışır:
 
 - **Aktif:** `dwh_health_log` içinde 24 ay
-- **Arşiv:** 24 aydan eski satırlar `dwh_health_log_archive`'a kopyalanır, ardından aktif tablodan silinir (iki ayrı sorgu; tek ifadeli sürüm PR #2'de, taslak)
+- **Arşiv:** 24 aydan eski satırlar tek bir SQL ifadesiyle (`DELETE ... RETURNING` → `INSERT`) `dwh_health_log_archive`'a taşınır; batch'ler `batch_size` ile bölünür (PR #2, `b0c0e5c`)
 - **Backend'ler:** yerel dosya sistemi (varsayılan); S3 ve Azure Blob planlandı (henüz uygulanmadı)
 
 ---
@@ -388,7 +388,7 @@ RetentionManager, DB'nin kendi TTL'inden veya bölümlemesinden bağımsız çal
 | F3 | API katmanı - /health, /metrics, /logs, /adapters, API anahtarı | Bitti |
 | F4 | MSSQL adaptörü - 8 FR kontrolü, ODBC Driver 18 | Bitti, kimlik bilgisi bekleniyor; mantık düzeltmeleri PR #3 (taslak) |
 | F5 | MySQL, MariaDB, Oracle, Genel ODBC adaptörleri | Bitti, kimlik bilgisi bekleniyor |
-| F6-02 | HashiCorp Vault entegrasyonu | Kısmi: dev modda; K-02 açık (düz metin) |
+| F6-02 | HashiCorp Vault entegrasyonu | Kısmi: dev modda, sunucuda durmuş. Düz metin git'ten çıktı (PR #18); döndürme ve Vault kararı açık (K-02) |
 | F6-04 | Prometheus alarm kuralları (6 kural) + Alertmanager | Bitti (kurallar PR #11 ile düzeltildi) |
 | F6-06 | Belgeler - yapılandırma dosyaları, SQL şeması | Bitti |
 | F6-01 | Kubernetes Helm chart | Taslak PR (#8), test bekliyor |

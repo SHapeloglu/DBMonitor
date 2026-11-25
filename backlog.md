@@ -10,7 +10,7 @@ Fazlara bölünmüş planlı iş `task.md`'de (Faz 0–6, açık kararlar K-01�
 
 - **K-06 Cold storage**: eski ölçüm/log verisinin S3 / Azure Blob / yerel arşive taşınması ve saklama politikası.
 - **K-07 `/metrics` erişim koruması**: API key yapıldı (PR #6). Kalan: Bearer JWT / IP whitelist ve Prometheus scrape'e `X-API-Key` başlığı eklenmesi.
-- **K-02 Secrets**: Vault (F6-02) kodu hazır ama sunucuda vault konteyneri durdurulmuş (2026-11-14 itibarıyla çalışmıyor; bugün doğrulanamadı), düz metin fallback açık — prod modu (sealed, Raft/file backend, servis hesabı token'ı, audit log) ve fallback'in kapatılması.
+- **K-02 Secrets**: Düz metin git'ten çıktı (PR #18, `587146d`). Kalan: geçmiş commit'lerdeki parolaların döndürülmesi; Vault (F6-02) kodu hazır ama sunucuda vault konteyneri durmuş (2026-11-25 `docker compose ps`); prod modu (sealed, Raft/file backend, servis hesabı token'ı, audit log) veya Vault'un kaldırılması kararı.
 
 ## Ertelenmiş üretim işleri
 
@@ -21,9 +21,11 @@ Fazlara bölünmüş planlı iş `task.md`'de (Faz 0–6, açık kararlar K-01�
 
 - Kontrol sonuçlarını VCE / DQ projeleriyle ortak bir "kalite skoru" modelinde birleştirme.
 - Adapter başına bağlantı testi CLI komutu (`scripts/`) — gerçek MSSQL/Oracle/MySQL bilgileri geldiğinde `enabled: true` öncesi doğrulama için.
-- Sunucudaki `docker-compose.yml` ve `config/` değişikliklerini git'te tutmak (`.bak` kopyaları silindi; ayrı bir deploy deposu veya PR #5 sonrası `.env` ayrımı). (2026-11-12 uygulandı: `config/` gece yedeğinde; kalan iş: harici kopya doğrulaması.)
+- Sunucudaki `docker-compose.yml` ve `config/` değişikliklerini git'te tutmak. (2026-11-25: sunucu `origin/main`'e alındı; parolalar `.env`'de, git'te değil. Kalan: sunucuda yerel değişiklik yapılmaması için deploy akışı; `git pull` yerine `origin/main`'den dağıtım.)
 - Harici (Windows aylık disk) yedek kopyasını doğrulamak. (2026-11-12 uygulandı: `pg_dump` + `config/` gece yedeğinde; kalan iş: harici kopya doğrulaması.)
-- Vault kararı: kalıcı üretim Vault kurmak ya da Vault'u ve `vault://` kodunu kaldırmak (şu an dev modda ve durdurulmuş).
+- Vault kararı: kalıcı üretim Vault kurmak ya da Vault'u ve `vault://` kodunu kaldırmak (şu an dev modda ve sunucuda durmuş).
+- Geri alma imajının silinmesi: `dwh-db-monitor-dwh-monitor:rollback-20261125` sabit bir parola varsayılanı içeriyor; stabil çalışma sonrası silinecek (onaylı).
+- `_export_local` yalnızca son 1 saatteki arşiv satırlarını JSONL'a yazıyor; uzun arşiv işlerinde erken batch'ler dosyaya girmeyebilir (2026-11-25 doğrulayıcı notu).
 - ~~Zayıf DB parolasını güçlü bir değerle değiştirmek (sunucuda).~~ (REDDEDİLDİ — kullanıcı kararı; parola değiştirilmeyecek)
 
 ## Doğrulanmış bulgular — takipsiz olanlar
@@ -42,12 +44,12 @@ Kaynak: doğrulayıcı kararları (V1–V5), 2026-11-14. Bu F-kodları `task.md`
 - **F23** — API özel `_open_connection` ve `CircuitBreaker` özel alanlarına kilitsiz erişiyor — düşük — CONFIRMED, açık.
 - **F25** — Varsayılan kullanıcı üç dosyada hâlâ `dquser` (PR #9 sonrası `apache` ile tutarsız) — düşük — CONFIRMED. ✅ kapandı: PR #9 ile birleşti (2026-11-13); `dquser` origin/main'de yok.
 - **F26** — `databases.yaml` iddiası: sır dosyası okunamadığından kanıt alınamadı — düşük — REJECTED (kanıtsız).
-- **F27** — Test kapsamı: `tests/test_api.py` ve `tests/test_collector_engine.py` (PR #14). Notifier ve AdapterRegistry hâlâ testsiz; CircuitBreaker doğrudan test edilmiyor; RetentionManager hiçbir testte geçmiyor; tests/test_collector_engine.py yalnızca FakeRetention kullanıyor (2026-11-24, `tests/` içeriği) — orta — CONFIRMED, kısmen açık.
+- **F27** — Test kapsamı: `tests/test_api.py`, `tests/test_collector_engine.py` (PR #14) ve `tests/test_retention_manager.py` (PR #2, 2026-11-25; sahte bağlantı ile birim testleri). Notifier ve AdapterRegistry hâlâ testsiz; CircuitBreaker doğrudan test edilmiyor; `RetentionManager`'ın gerçek SQL davranışı CI'da test edilmiyor (yalnızca yerel PostgreSQL doğrulaması yapıldı); tests/test_collector_engine.py yalnızca FakeRetention kullanıyor — orta — CONFIRMED, kısmen açık.
 - **F28** — `ruff.toml` yalnızca 4 kural grubu seçiyor (F401/F841 yakalanmaz); CI `tests/` yoksa atlıyor — düşük — CONFIRMED, açık.
 
-PR'ı olan bulgular (bilgi için; durum 2026-11-24, `gh pr list`):
+PR'ı olan bulgular (bilgi için; durum 2026-11-25, `gh pr list` ve `gh pr view`):
 
-- **F01** — PR #2 (DRAFT, retention); **F24** — PR #2 (DRAFT, ölü kod temizliği). Açık.
+- ✅ **F01, F24** — PR #2 (MERGED, `b0c0e5c`, 2026-11-25): tek CTE, ölü kod temizliği, `batch_size` doğrulaması.
 - ✅ **F02, F03, F04** — PR #11 (MERGED).
 - ✅ **F06, F07, F20** — PR #12 (MERGED).
 - ✅ **F08, F09, F10, F11, F12, F13** — PR #14 (MERGED).

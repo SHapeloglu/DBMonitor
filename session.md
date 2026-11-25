@@ -3,6 +3,29 @@
 > Sıra: en yeni oturum en üstte. 11. ve 12. oturumlardaki "Sonraki" listeleri o günün durumudur; güncel liste `task.md`'dedir.
 > Not: numaralar 2026-08 kayıtlarında çakışıyordu; ayırt için harf eklendi (11a, 11b, 12a, 12b).
 
+## Oturum 15 — PR #2 birleştirme, sır dosyalarının git'ten çıkarılması, sunucu dağıtımı, md güncellemesi (2026-11-25)
+
+### Yapılanlar
+1. **PR #5 kapatıldı** (taslak, yerine PR #18 birleşti). Kapatma yorumu yazıldı.
+2. **PR #2, #3, #8 CI'a bağlandı:** Dallarda `ci.yml` yoktu, CI çalışmıyordu. Her dal `origin/main` ile birleştirilip push edildi (`7d60963`, `5582b78`, `ddea741`). Lint, Test ve Docker build geçti.
+3. **PR #2 için birim testleri ve doğrulama:** `tests/test_retention_manager.py` (6 test) ve `batch_size < 1` doğrulaması eklendi (`604f4a4`). `batch_size: 0` döngüyü sonsuz yapıyordu. Gerçek PostgreSQL'de (pgserver) doğrulandı: 25 arşiv, 5 kalan, arşivde tekrar yok, dry-run değişiklik yapmıyor, `batch_size: 0` reddediliyor. Bağımsız doğrulayıcı `PASS_WITH_NOTES` verdi (engelleyici yok; `_export_local` 1 saat penceresi ve dry-run'da `CALL` notları ayrı iş). CI yeşil. **PR #2 main'e birleşti (`b0c0e5c`).**
+4. **PR #3 ve #8 açıklamaları** CI durumu ve açık risklerle güncellendi. Helm `values.yaml` içindeki `DB_USER: "dquser"` düzeltildi (`df64bce`, `apache`). Helm config kopyalarındaki parola satırlarının tamamı `REPLACE_ME` olduğu kontrol edildi.
+5. **Sunucu analizi (salt okunur):** disk %92 (17 GB boş). Sunucu repo'su `f53b1ad`'de, GitHub `main`'den ayrışmış, 34 yerel değişiklik. Sunucu kodunda sabit bir parola varsayılanı varsayılanı vardı; compose'da `POSTGRES_PASSWORD` ve `DB_PASS` düz metindi; healthcheck `dqmetrics` kullanıyordu (gerçek DB `dwhmonitor`). Restic politikası zaten mevcut (14 gün / 8 hafta / 12 ay + prune); ek silme yapılmadı.
+6. **Dağıtım (onaylı):** Yedek `/root/yedekler/pre-deploy-20261125-1308` (sır dosyaları, eski compose, DB dump, yerel değişiklik patch'i; hepsi mod 600). Mevcut Postgres parolası `.env`'e `DQ_DB_PASSWORD` olarak kopyalandı (değer yazdırılmadı). Sunucu repo'su `origin/main` `b0c0e5c`'ye alındı, `config/databases.yaml` yedekten geri konuldu. Yalnızca `dwh-monitor` yeniden build edilip başlatıldı (`--no-deps`, Postgres'e dokunulmadı). `/health` → `persist_ok: true`.
+7. **Hata ve düzeltme:** Git reset'i `umask 077` ayarlıyken yapıldığı için 48 dosya mod 600 oluştu; Prometheus kuralları okuyamadı (`permission denied`). Dosyalar 644 yapıldı, sır dosyaları 600 kaldı. Sonra `promtool` (6 kural) ve `amtool` doğrulandı, Prometheus ve Alertmanager yeniden başlatıldı. Hedefler: alertmanager, dwh-metrics, prometheus hepsi `up`. Firing alarm 0.
+8. **Geri alma:** Eski imaj `dwh-db-monitor-dwh-monitor:rollback-20261125` olarak etiketli. Bu imajda sabit bir parola varsayılanı var; stabil çalışma sonrası silinecek.
+9. **Açık kalanlar:** Parolaların döndürülmesi (apache, etl_svc, SMTP, Postgres); Alertmanager alıcısı (`localhost:5001` gerçek alıcı değil); K-02 Vault kararı; PR #3 (staging MSSQL) ve PR #8 (`helm lint`) için doğrulama; PR #15 CI düzeltmesi.
+
+### Bulgular
+- Sır dosyaları git'ten çıkarıldı (`587146d`), ama repo herkese açık ve geçmişte düz metin parolalar hâlâ var. Döndürme olmadan geçmiş temizliği bir koruma değildir.
+- Dağıtımda `.env`'in tam içeriği main'in compose'unun beklediği değişkenlerle karşılaştırıldı: yalnızca `DQ_DB_PASSWORD` ve `VAULT_TOKEN` (değerler gösterilmedi).
+- Doğrulayıcı agent'ın ilk denemesinde CI sorgusu araç hatasıyla başarısız oldu; CI durumu lead tarafından ayrıca doğrulandı.
+
+### Sonraki
+Bkz. `task.md` "Sonraki oturumda yapılacaklar". Öncelik: döndürme, ardından `.env` güncellemesi ve `dwh-monitor` restart'ı.
+
+---
+
 ## Oturum 14 — Kapsam katmanı, PR birleştirme, sunucu nginx kısıtlaması, md denetimi (2026-11-13..24)
 
 ### Yapılanlar
