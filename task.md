@@ -117,6 +117,7 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | PR | Dal | İçerik | Not |
 |---|---|---|---|
 | #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | DRAFT. CI geçti (`5582b78`). Gerçek MSSQL ile test gerekli |
+
 Kapatıldı: #5 (`chore/config-secrets-env`, yerine #18 birleşti). #15 (`chore/agent-scope-layer`, alt ajan kapsam koruyucusu): kapatıldı, CI başarısızdı ve doğrulayıcı FAIL verdi; dal korunuyor.
 
 Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, #7, #8, #9, #10, #11, #12, #13, #14, #16, #17, #18, #19, #20.
@@ -131,10 +132,8 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 4. **Helm kümede test:** `helm install --dry-run` bir Kubernetes kümesinde yapılmalı (CI'da yok).
 5. **`arsiv_tarihi` indeksi:** export sorgusu tam tarama yapabilir (PR #20 doğrulayıcı notu). Veri büyüdükçe indeks değerlendirilmeli.
 6. **Kalan `10.0.0.x` referansları:** `tests/` (fixture) ve `scripts/vault-init.py` (kod). Ayrı karar gerekir; düşük öncelik.
-7. **Alertmanager alıcısı:** `localhost:5001` yerine gerçek bir kanal (Slack veya e-posta) gerekli. Bilgi bekleniyor.
 7. **K-02 kararı:** kalıcı üretim Vault mı, Vault'u kaldırmak mı (Vault dev modda, sunucuda durdurulmuş).
-7. **Alertmanager alıcısı:** `config/alertmanager.yml` `localhost:5001`; gerçek bir alıcı (Slack/e-posta) gerekli. Gizli değerler `.env`'e girer, dokümana değil.
-8. **`_export_local` 1 saat penceresi:** uzun süren arşiv işlerinde erken batch'ler JSONL'a yazılmayabilir. Ayrı bir düzeltme olarak ele alınmalı.
+8. **Alertmanager alıcısı:** `config/alertmanager.yml` `localhost:5001`; gerçek bir kanal (Slack/e-posta) gerekli. Gizli değerler `.env`'e girer, dokümana değil.
 9. **Disk (%92, 17 GB boş):** restic politikası mevcut (`/opt/yedek/restic_yedek.sh`, gece `forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune`). Disk baskısının kaynağı başka projelerin verileri ve imajları; onlara dokunulmaz.
 10. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini değiştir (DBA işi) ve adapter'ları `enabled: true` yap.
 11. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula; sunucudan doğrulanamıyor.
