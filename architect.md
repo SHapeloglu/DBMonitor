@@ -1,6 +1,6 @@
 # DWH İzleme Sistemi — Mimari
 
-Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-24, `origin/main` 12402de). Main'e birleşenler: PR #1, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#2, #3, #5, #8, #15; 2026-11-24 itibarıyla hepsi DRAFT) "Bekleyen" olarak işaretlidir.
+Bu dosya `origin/main` kodu okunarak yazılmıştır (son güncelleme: 2026-11-25, `origin/main` b0c0e5c). Main'e birleşenler: PR #1, #2, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16, #17, #18. Açık PR'larda olan ama henüz main'e girmemiş değişiklikler (#3, #8, #15; 2026-11-25 itibarıyla hepsi DRAFT) "Bekleyen" olarak işaretlidir. #5 kapatıldı.
 
 ## 1. Amaç
 
@@ -32,7 +32,7 @@ config/databases.yaml ──► AdapterRegistry ──► DBAdapter (5 platform)
 | Yükleyici | `core/adapter_registry.py` | YAML okur, adapter sınıfını `importlib` ile yükler, `vault://` referanslarını çözer |
 | Zamanlayıcı | `core/collector_engine.py` | Saatlik toplama (`COLLECT_CRON`, varsayılan `0 * * * *`), adapter başına circuit breaker (3 hata → 300 sn bekleme), sonuçları loga yazar. Bağlantı/sağlık hatası veren veya devresi açık DB için o tura ERROR metriği üretir (kategori `sistem`, `kontrol_kodu` `FR-SYS-01`, severity 3). Aynı anda tek tur: toplama kilidi alınamazsa scheduler turu atlar, elle istek `CollectionBusy` alır. Açılışta cron'u beklemeden bir toplama yapılır (PR #14) |
 | Bildirim | `core/notifier.py` | SMTP, Slack, PagerDuty, Teams, genel webhook; DB'ye bağımlı değil |
-| Saklama | `core/retention_manager.py` | 24 ay aktif saklama, eski satırları arşiv tablosuna taşır. Bekleyen (PR #2): tek CTE ile taşır; main'de hâlâ eski DELETE kodu var; `RETENTION_CRON` varsayılan `0 1 1 * *` |
+| Saklama | `core/retention_manager.py` | 24 ay aktif saklama, eski satırları arşiv tablosuna taşır. Tek CTE ile taşır (PR #2, `b0c0e5c`); `batch_size` 1'den küçükse yükleme reddedilir; `RETENTION_CRON` varsayılan `0 1 1 * *` |
 | Adapter'lar | `adapters/*.py` | `postgresql` (8 FR), `mssql` (8 FR), `mysql` (MySQL + MariaDB), `oracle`, `generic_odbc` (3 FR) |
 | API | `api/main.py`, `api/logs.py`, `api/auth.py` | Aşağıda |
 
@@ -67,13 +67,15 @@ Sonuç değerleri: `OK`, `WARNING`, `ERROR`. Severity 1–3. **Bekleyen (PR #3):
 
 Monitor'ün kendi log DB bağlantısı ortam değişkenlerinden gelir: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`. `DB_PASS` zorunludur, kodda varsayılan şifre yoktur.
 
-**Bekleyen (PR #5):** YAML yükleyicileri `${NAME}` ortam değişkenlerini açar; böylece `databases.yaml`'daki kimlik bilgileri `.env`'e taşınır. Değişiklik uyumsuzdur: dağıtımda 8 değişkenin tanımlı olması gerekir. (2026-11-24: `origin/main` Python dosyalarında `expandvars` yok; PR #5 birleşmedi.)
+Kimlik bilgileri (PR #18, `587146d`): `config/databases.yaml` ve `.env` git'ten dışlandı (`.gitignore`). Git'teki `config/databases.example.yaml` yer tutucu içerir. Compose parolaları `.env`'den okur (`DQ_DB_PASSWORD` zorunlu, `${DQ_DB_PASSWORD:?...}`). `${NAME}` genişletme yöntemi (eski PR #5) kullanılmadı; PR #5 kapatıldı.
 
 ## 7. Dağıtım
 
-`docker-compose.yml` servisleri: `postgres` (container `dq-postgres`, host portu 127.0.0.1:5433), `dwh-monitor` (127.0.0.1:8005), `prometheus` (9090), `alertmanager` (9093), `vault` (8200, dev). Tüm portlar yalnızca 127.0.0.1'e bağlıdır. `DQ_DB_PASSWORD` `.env`'den zorunlu okunur (compose'da `:?` ile; 2026-11-14 `facts.json` kaydı).
+`docker-compose.yml` servisleri: `postgres` (container `dq-postgres`, host portu 127.0.0.1:5433), `dwh-monitor` (127.0.0.1:8005), `prometheus` (9090), `alertmanager` (9093), `vault` (8200, dev). Tüm portlar yalnızca 127.0.0.1'e bağlıdır. `DQ_DB_PASSWORD` `.env`'den zorunlu okunur (compose'da `:?` ile; `origin/main` `docker-compose.yml`).
 
 DB kullanıcısı `apache` (PR #9 main'de; `api/main.py` varsayılanı `apache`).
+
+Sunucu dağıtımı (2026-11-25): sunucuda `origin/main` `b0c0e5c` çalışıyor, yalnızca `dwh-monitor` yeniden build edildi. Dağıtım öncesi yedek `/root/yedekler/pre-deploy-20261125-1308`. Geri alma imajı `dwh-db-monitor-dwh-monitor:rollback-20261125` (sabit bir parola varsayılanı içerir; stabil sonrası silinecek).
 
 **Bekleyen:** Helm chart (PR #8, F6-01, taslak).
 
@@ -81,17 +83,17 @@ Sunucuda nginx yalnızca `/health` yolunu dışarıya açar; diğer yollar 403 d
 
 Alertmanager alıcısı: `config/alertmanager.yml` 16. satır `http://localhost:5001/alerts`. Compose dosyasında 5001 portunu kullanan servis yok (2026-11-24, kod kontrolü); gerçek alıcı tanımlı değil, karar bekliyor.
 
-CI: `.github/workflows/ci.yml` — ruff, py_compile + pytest, docker build (PR'larda ve main'e push'ta).
+CI: `.github/workflows/ci.yml` — ruff, py_compile + pytest (`tests/`: test_api, test_collector_engine, test_retention_manager, test_config_example), docker build (PR'larda ve main'e push'ta). Dal, `origin/main`'den önce açılmışsa `ci.yml` yoktur; dalı `origin/main` ile birleştirmek gerekir.
 
 ## 8. Sır yönetimi (Vault, F6-02)
 
 Kod tarafı: `adapter_registry._resolve_credentials()` `credentials: vault://db/<ad>` değerini hvac ile Vault KV v2'den (`secret/data/db/*`) çözer (`core/adapter_registry.py`); Vault erişilemezse kimlik bilgileri olduğu gibi kalır. İki biçim desteklenir: tüm sözlük (`vault://db/ad`) veya tek alan (`password: vault://db/ad`). `scripts/vault-init.py` policy ve kimlik bilgilerini yükler.
 
-Gerçek durum: Vault **dev modunda** (bellek içi, her açılışta rastgele token, veri kaybolur). `config/databases.yaml`'da `vault://` referansı yoktur, kimlik bilgileri düz metindir; monitor çalışma zamanında Vault'tan okumaz. 2026-11-14 itibarıyla sunucuda Vault konteyneri çalışmıyordu (`facts.json`, `vault_running: 0`; bugün doğrulanamadı). Üretim için sealed mod, kalıcı backend (file/Raft), servis hesabı token'ı ve audit log gerekir (K-02 açık).
+Gerçek durum: Vault **dev modunda** (bellek içi, her açılışta rastgele token, veri kaybolur). Sunucuda Vault konteyneri çalışmıyor (2026-11-25 `docker compose ps` çıktısında `vault` servisi yok). Kimlik bilgileri sunucudaki `config/databases.yaml` (git dışı, mod 600) ve `.env`'de; monitor çalışma zamanında Vault'tan okumaz. Üretim için sealed mod, kalıcı backend (file/Raft), servis hesabı token'ı ve audit log gerekir (K-02 açık).
 
 ## 9. Saklama
 
-`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık; bu iki backend yalnızca log yazar, `core/retention_manager.py` içinde "henüz tam implemente edilmedi" — arşivleme yapılmaz), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır. Bu düzeltme PR #2'de (taslak), main'de hâlâ eski kod vardır: `_archive_old_rows` (122. satır) ve `_delete_old_rows` (175. satır) ayrı sorgular olarak çalışır (2026-11-24, `core/retention_manager.py`).
+`RetentionManager`: `active_months: 24`, `archive_backend: local` (S3/Azure stub, K-06 açık; bu iki backend yalnızca log yazar, `core/retention_manager.py` içinde "henüz tam implemente edilmedi" — arşivleme yapılmaz), `batch_size: 10000`. Eski satırlar `WITH moved AS (DELETE ... RETURNING ...) INSERT ...` ile tek ifadede arşive taşınır (`_archive_old_rows`, `core/retention_manager.py`; PR #2 `b0c0e5c`, 2026-11-25). Eski ayrı `_delete_old_rows` kaldırıldı. Bilinen sınır: `_export_local` yalnızca son 1 saatte arşive eklenen satırları JSONL'a yazar; uzun süren bir arşiv işinde erken batch'ler dosyaya girmeyebilir (ayrı iş, `task.md`).
 
 ## 10. Dokümantasyon
 

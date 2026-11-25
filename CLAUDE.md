@@ -4,16 +4,17 @@
 
 ## Çalışma kuralları
 - `main`'e doğrudan push yok. Özellik dalı + taslak PR (`gh pr create --draft`). `gh pr edit` Projects classic hatası verir: `gh api -X PATCH repos/SHapeloglu/DBMonitor/pulls/N -F body=@dosya`.
-- Kodda şifre/token yok. `DB_PASS` zorunlu ortam değişkenidir; `.env` ve `config/databases.yaml` sunucuda mod 600 olmalı. Sır içeren dosyalar git'e girmemeli; mevcut durum: `config/databases.yaml` git'te izleniyor (PR #5 kapsamında çözülecek).
-- Testler: `pytest` (`tests/test_api.py`, `tests/test_collector_engine.py`), lint: `ruff check .` (CI: `.github/workflows/ci.yml`). Yerelde Docker/helm olmayabilir.
+- Kodda şifre/token yok. `DB_PASS` zorunlu ortam değişkenidir; `.env` ve `config/databases.yaml` sunucuda mod 600 olmalı. Sır içeren dosyalar git'e girmemeli: `config/databases.yaml` ve `.env` `.gitignore`'da (PR #18, `587146d`); git'teki şablon `config/databases.example.yaml` yalnızca yer tutucu içerir. Geçmiş commit'lerde düz metin parolalar hâlâ görünür (repo herkese açık); döndürme bekliyor (bkz. `task.md`).
+- Testler: `pytest` (`tests/test_api.py`, `tests/test_collector_engine.py`, `tests/test_retention_manager.py`, `tests/test_config_example.py`), lint: `ruff check .` (CI: `.github/workflows/ci.yml`). Yerelde Docker/helm olmayabilir.
 - Doküman değişince `task.md` durumu, `session.md` günlüğü ve ilgili PR numarası birlikte güncellenir. Durum yazarken kodu/`git log`'u kontrol et; hafızadan yazma.
 - Sunucu (Contabo): `/opt/dwh-db-monitor`, compose proje adı aynı klasör. Servis adları `postgres`, `dwh-monitor`, `prometheus`, `alertmanager`, `vault`. `dwh-monitor` imajı yerel build'dir (`build: .`); kod değişince `docker compose build dwh-monitor` gerekir, değişmediyse `up -d --no-build` yeterli.
 
-## Güncel durum (2026-11-24)
-- main (`12402de`): PR #1, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16 birleşti (`gh pr list --state all`, 2026-11-24). PR #10 (`1301be4`) ve PR #16 (`12402de`) doküman birleşmeleri. Faz 0–5 görevlerinin çoğu ✅; F1-06 kısmi, F4 mantık düzeltmeleri PR #3'te (`task.md`). F0-05, F3-04, F3-07 bitti.
-- Açık taslak PR'lar (2026-11-24, DRAFT): #2 retention, #3 MSSQL, #5 `${ENV}` açma (uyumsuz), #8 Helm, #15 ajan kapsam koruyucusu. Ayrıntı: `task.md`.
-- main'de `DB_USER` varsayılanı `apache` (`api/main.py:53`, PR #9 birleşti). Sunucudaki DB kullanıcısı ve parola durumu 2026-11-14 itibarıyla (`.claude/findings/facts.json`); bugün doğrulanamadı.
-- Adapter'lar (PostgreSQL hariç) `enabled: false` (`task.md` Faz 4–5); uzak DB şifreleri placeholder. `config/databases.yaml` bu turda okunamadı; doğrulanamadı.
+## Güncel durum (2026-11-25)
+- main (`b0c0e5c`): PR #1, #2, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16, #17, #18 birleşti (`gh pr list --state merged`, 2026-11-25). #2 retention tek CTE + `batch_size` doğrulaması (`b0c0e5c`); #18 sır dosyaları git'ten çıkarıldı (`587146d`).
+- Açık taslak PR'lar (2026-11-25, DRAFT): #3 MSSQL (CI geçti, gerçek MSSQL testi yok), #8 Helm (CI geçti, `helm lint` yok), #15 ajan kapsam koruyucusu (CI test başarısız). #5 kapatıldı (#18 ile değiştirildi). Ayrıntı: `task.md`.
+- Sunucu (Contabo) 2026-11-25'te `origin/main` `b0c0e5c` ile dağıtıldı. Compose parolaları `.env`'den okuyor (`DQ_DB_PASSWORD`, `VAULT_TOKEN`). Dağıtım öncesi yedek: `/root/yedekler/pre-deploy-20261125-1308`. Parolalar henüz döndürülmedi.
+- main'de `DB_USER` varsayılanı `apache` (`api/main.py`, PR #9). Döndürme sonrası `.env` güncellenip `dwh-monitor` yeniden başlatılmalı.
+- Adapter'lar (PostgreSQL hariç) `enabled: false` (`task.md` Faz 4–5); uzak DB şifreleri placeholder.
 
 ---
 
@@ -46,7 +47,7 @@ Vault token'ını koda gömmek anti-pattern'dir. Bunun yerine kullan:
 ## F6-02 Vault Entegrasyonu (Oturum 11)
 
 ### Mevcut Durum (doğrulandı)
-- Kimlik bilgileri şu an `config/databases.yaml` içinde düz metin. Dosya git'te izleniyor (`git ls-tree origin/main config/`); K-02 açık. Eski satır numaraları (13, 26, 39, 52, 65, 76) bu turda doğrulanamadı.
+- Oturum 11 döneminde kimlik bilgileri `config/databases.yaml` içinde düz metindi. 2026-11-25 itibarıyla dosya git'ten çıkarıldı (PR #18, `587146d`), sunucuda yalnızca disk üzerindeki kopyası var (mod 600). K-02 kısmen kapandı: düz metin git'te değil, ama Vault kararı ve döndürme açık.
 - Monitor'ün kendi DB bağlantısı ortam değişkenlerinden okunur: `DB_USER`, `DB_PASS` (`api/main.py:53-54`).
 - Vault dev modda tanımlı (`docker-compose.yml`, `vault-dev`); 2026-11-14 itibarıyla sunucuda konteyner çalışmıyor (`facts.json`, `vault_running: 0`; bugün doğrulanamadı). Dev modda restart'ta veri kaybolduğu için kimlik bilgileri YAML'a taşındı (session.md, Oturum 12). `config/databases.yaml`'da `vault://` referansı olmadığı için monitor çalışma zamanında Vault okumuyor.
 

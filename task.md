@@ -24,7 +24,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 | F1-03 | ✅ `AdapterRegistry` — YAML + importlib | `core/adapter_registry.py` | Tamamlandı |
 | F1-04 | ✅ `CollectorEngine` — APScheduler + circuit breaker | `core/collector_engine.py` | Tamamlandı. K-01 → APScheduler seçildi |
 | F1-05 | ✅ `Notifier` — SMTP + Slack + PagerDuty + Teams | `core/notifier.py` | Tamamlandı, 3 kural yüklü |
-| F1-06 | 🔄 `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Kısmi: yalnızca yerel arşiv. S3/Azure export stub, K-06 açık. Tek ifadede arşivleme düzeltmesi PR #2'de (taslak, staging testi bekliyor) |
+| F1-06 | 🔄 `RetentionManager` — 24 ay + cold storage | `core/retention_manager.py` | Kısmi: yalnızca yerel arşiv. S3/Azure export stub, K-06 açık. Tek ifadede arşivleme ve `batch_size` doğrulaması PR #2 ile main'de (`b0c0e5c`, 2026-11-25). Gerçek PostgreSQL'de doğrulandı (25 arşiv, 5 kalan, dry-run değişiklik yapmıyor). CI birim testleri: `tests/test_retention_manager.py` (6 test). Açık: `_export_local` yalnızca son 1 saatteki satırları yazıyor (ayrı iş) |
 
 ---
 
@@ -56,7 +56,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 | # | Görev | Durum |
 |---|---|---|
-| F4-01..F4-09 | ✅ MSSQLAdapter — 8 FR kontrolü | Tamamlandı. `enabled: false`, gerçek bağlantı bilgisi bekliyor. Mantık düzeltmeleri PR #3'te (taslak) |
+| F4-01..F4-09 | ✅ MSSQLAdapter — 8 FR kontrolü | Tamamlandı. `enabled: false`, gerçek bağlantı bilgisi bekliyor. Mantık düzeltmeleri PR #3'te (taslak; CI geçti, gerçek SQL Server testi yapılmadı) |
 
 **Çalışan FR kontrolleri:** FR-COST-01/03, FR-DQ-04, FR-PIPE-01/04, FR-USER-04, FR-SEC-01/03  
 **Driver:** ODBC Driver 18 for SQL Server — host + Docker image'a kuruldu  
@@ -82,8 +82,8 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 | # | Görev | Öncelik | Durum |
 |---|---|---|---|
-| F6-01 | Kubernetes Helm chart | Yüksek | 🔄 PR #8 (taslak), helm ile test edilmedi |
-| F6-02 | 🔄 Secrets yönetimi — Vault | Yüksek | 🔄 Dev modda tamamlandı; prod kurulumu ve düz metin kaldırma K-02 açık. Vault sunucuda durdurulmuş (2026-11-14 itibarıyla, `facts.json` `vault_running: 0`; bugün doğrulanamadı); `config/databases.yaml` düz metin. F0-03 ile birleştirildi (tekrar eden satır). |
+| F6-01 | Kubernetes Helm chart | Yüksek | 🔄 PR #8 (taslak). CI geçti (`df64bce`: varsayılan `DB_USER` `apache`), `helm lint`/`template` çalıştırılmadı |
+| F6-02 | 🔄 Secrets yönetimi — Vault | Yüksek | 🔄 Düz metin git'ten çıktı (PR #18, `587146d`); compose parolaları `.env`'den okuyor (2026-11-25 dağıtım). Vault dev modda, sunucuda durdurulmuş; prod Vault kararı (K-02) ve döndürme bekliyor. F0-03 ile birleştirildi (tekrar eden satır). |
 | F6-03 | Grafana dashboard JSON | Orta | ⬜ Deferred |
 | F6-04 | ✅ Prometheus alert rules | Orta | ✅ Tamamlandı (6 alert rule, Alertmanager UP). Kurallar değere göre ve pencereli (`last_over_time(...[70m])`, `absent_over_time`); PR #11 (MERGED), `config/prometheus/rules/dwh-health.yml` |
 | F6-05 | Horizontal scaling — Redis koordinasyon | Düşük | ⬜ Yapılmadı |
@@ -103,7 +103,7 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | # | Karar | Durum | Not |
 |---|---|---|---|
 | K-01 | APScheduler mi, Celery mi? | ✅ APScheduler | Seçildi, çalışıyor |
-| K-02 | Secrets yönetimi | ⬜ Açık | Düz metin. PR #5 (`${ENV}` açma) DRAFT (2026-11-24, `gh pr list`); Vault dev modda, sunucuda durdurulmuş (2026-11-14 itibarıyla) |
+| K-02 | Secrets yönetimi | 🔄 Kısmi | Git'te düz metin kalmadı (PR #18, `587146d`); sunucuda `.env` (mod 600). Açık: geçmişteki parolaların döndürülmesi, prod Vault kararı (Vault dev modda, sunucuda durdurulmuş). PR #5 kapatıldı (#18 ile değiştirildi) |
 | K-03 | Oracle AWR/ASH lisansı | ✅ Yok | Sadece V$/DBA_* kullanılıyor |
 | K-04 | MySQL edition | ✅ Community | INFORMATION_SCHEMA + performance_schema |
 | K-05 | Teradata BRD | ⬜ Açık | Rakip analizi sonrası |
@@ -116,27 +116,31 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 
 | PR | Dal | İçerik | Not |
 |---|---|---|---|
-| #2 | `fix/retention-cte-move` | Retention: tek ifadede arşivleme, ölü kod | DRAFT. Staging testi gerekli |
-| #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | DRAFT. Gerçek MSSQL ile test gerekli |
-| #5 | `chore/config-secrets-env` | YAML'da `${NAME}` açma, şifreleri `.env`'e taşıma | DRAFT. Uyumsuz: 8 ortam değişkeni zorunlu; sunucuda image yeniden build gerekir |
-| #8 | `feat/helm-chart` | Helm chart (F6-01) | DRAFT. `helm lint/template` çalıştırılmadı |
-| #15 | `chore/agent-scope-layer` | Alt ajanlar için kapsam koruyucusu | DRAFT |
+| #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | DRAFT. CI geçti (`5582b78`). Gerçek MSSQL ile test gerekli |
+| #8 | `feat/helm-chart` | Helm chart (F6-01) | DRAFT. CI geçti (`df64bce`). `helm lint/template` çalıştırılmadı |
+| #15 | `chore/agent-scope-layer` | Alt ajanlar için kapsam koruyucusu | DRAFT. CI testi başarısız, doğrulayıcı FAIL |
 
-Birleşenler (main'de, 2026-11-24 `gh pr list --state all`): #1, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16.
+Kapatıldı: #5 (`chore/config-secrets-env`, yerine #18 birleşti).
+
+Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, #7, #9, #10, #11, #12, #13, #14, #16, #17, #18.
 
 ---
 
 ## Sonraki oturumda yapılacaklar
 
-1. Açık taslak PR'ları sırayla incele, staging'de test et ve birleştir: #2, #3, #5, #8, #15 (2026-11-24 itibarıyla hepsi DRAFT). PR #15 için ikinci bağımsız doğrulama tamamlanmadı; taslak kalıyor.
-2. Sunucuda PR #5 sonrası düz metin şifreleri `.env`'e taşı (image yeniden build gerekir)
-3. K-02 kararı: kalıcı üretim Vault mı, Vault'u kaldırmak mı (2026-11-14 itibarıyla dev konteyner sunucuda durdurulmuş; bugün doğrulanamadı)
-4. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini gerçek değerle değiştir (DBA işi) ve adapter'ları `enabled: true` yap
-5. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula. `pg_dump` + `config/` gece yedeğine eklendi (2026-11-12). Restic cron 04:30; son başarılı çalışma 2026-11-14 04:33 (snapshot fcace2e3, depo 24G), kaynak `.claude/findings/facts.json` (2026-11-14 tarihli; sonraki günler sunucudan doğrulanmalı)
-6. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle
-7. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik)
-8. Alertmanager alıcı kararı: `config/alertmanager.yml` 16. satır `localhost:5001`; compose'da bu portu dinleyen servis yok (kod kontrolü 2026-11-24)
-9. `dwh-monitor` imajı yeniden build ve sunucu dağıtımı: 2026-11-14 kaydına göre imaj 2026-11-09 tarihli; F08–F13 düzeltmelerini içerip içermediği doğrulanamadı
+1. **Döndürme (öncelik 1, DBA/sahip işi):** `apache`, `etl_svc`, SMTP kullanıcısı ve Postgres parolası (`DQ_DB_PASSWORD`). Tamamlanınca sunucuda `.env` güncellenip `dwh-monitor` yeniden başlatılır. Geçmiş commit'lerdeki eski kod sürümündeki parola varsayılanı ve eski parolalar da "ele geçirilmiş" sayılmalı.
+2. **Geri alma imajını sil:** `dwh-db-monitor-dwh-monitor:rollback-20261125` içinde sabit bir parola varsayılanı var. Yeni sürüm birkaç gün stabil çalıştıktan sonra silinecek (onaylı).
+3. **PR #3:** gerçek SQL Server (staging) testi, sonra birleştirme.
+4. **PR #8:** CI'a `helm lint` ve `helm template` adımı eklenmeli, sonra birleştirme.
+5. **PR #15:** taslak kalır; CI düzeltmesi ve ikinci bağımsız doğrulama bekliyor.
+6. **K-02 kararı:** kalıcı üretim Vault mı, Vault'u kaldırmak mı (Vault dev modda, sunucuda durdurulmuş).
+7. **Alertmanager alıcısı:** `config/alertmanager.yml` `localhost:5001`; gerçek bir alıcı (Slack/e-posta) gerekli. Gizli değerler `.env`'e girer, dokümana değil.
+8. **`_export_local` 1 saat penceresi:** uzun süren arşiv işlerinde erken batch'ler JSONL'a yazılmayabilir. Ayrı bir düzeltme olarak ele alınmalı.
+9. **Disk (%92, 17 GB boş):** restic politikası mevcut (`/opt/yedek/restic_yedek.sh`, gece `forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune`). Disk baskısının kaynağı başka projelerin verileri ve imajları; onlara dokunulmaz.
+10. Uzak DB'lerde `etl_svc` hesaplarının şifrelerini değiştir (DBA işi) ve adapter'ları `enabled: true` yap.
+11. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula; sunucudan doğrulanamıyor.
+12. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle.
+13. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik).
 
 ---
 
@@ -172,3 +176,8 @@ Birleşenler (main'de, 2026-11-24 `gh pr list --state all`): #1, #4, #6, #7, #9,
 | 2026-11-08..09 | Sunucu ↔ GitHub senkronu, güvenlik düzeltmeleri | PR #1: sabit şifre varsayılanları kaldırıldı, portlar 127.0.0.1'e bağlandı |
 | 2026-11-09 | Md çelişkileri giderildi | PR #4 |
 | 2026-11-09 | Sunucuda DB şifresi döndürüldü, kullanıcı `apache` yapıldı | Repoda PR #9 (2026-11-13 birleşti). Dosya izinleri 600, `.bak` kopyaları silindi |
+| 2026-11-25 | PR #2 retention (tek CTE) | `b0c0e5c`: birim testleri (`tests/test_retention_manager.py`), `batch_size` doğrulaması, gerçek PostgreSQL doğrulaması. Doğrulayıcı PASS_WITH_NOTES |
+| 2026-11-25 | PR #18 sır dosyaları | `587146d`: `config/databases.yaml` git'ten çıktı, örnek ve dokümanlar yer tutucu, `tests/test_config_example.py` |
+| 2026-11-25 | Sunucu dağıtımı (`origin/main` `b0c0e5c`) | Dağıtım öncesi yedek `/root/yedekler/pre-deploy-20261125-1308`; `.env`'e `DQ_DB_PASSWORD`; yalnızca `dwh-monitor` yeniden build; `persist_ok: true`; Prometheus 3/3 up; 6 kural yüklü; firing alarm 0. Parolalar değişmedi |
+| 2026-11-25 | PR #3 / #8 CI ve düzeltmeler | Dallar `origin/main` ile birleştirilip CI tetiklendi (`5582b78`, `ddea741`); helm `DB_USER` `apache` (`df64bce`); PR açıklamalarına doğrulama eksikleri yazıldı |
+| 2026-11-25 | PR #5 kapatıldı | PR #18 ile değiştirildi |
