@@ -14,7 +14,11 @@
 6. **Dağıtım (onaylı):** Yedek `/root/yedekler/pre-deploy-20261125-1308` (sır dosyaları, eski compose, DB dump, yerel değişiklik patch'i; hepsi mod 600). Mevcut Postgres parolası `.env`'e `DQ_DB_PASSWORD` olarak kopyalandı (değer yazdırılmadı). Sunucu repo'su `origin/main` `b0c0e5c`'ye alındı, `config/databases.yaml` yedekten geri konuldu. Yalnızca `dwh-monitor` yeniden build edilip başlatıldı (`--no-deps`, Postgres'e dokunulmadı). `/health` → `persist_ok: true`.
 7. **Hata ve düzeltme:** Git reset'i `umask 077` ayarlıyken yapıldığı için 48 dosya mod 600 oluştu; Prometheus kuralları okuyamadı (`permission denied`). Dosyalar 644 yapıldı, sır dosyaları 600 kaldı. Sonra `promtool` (6 kural) ve `amtool` doğrulandı, Prometheus ve Alertmanager yeniden başlatıldı. Hedefler: alertmanager, dwh-metrics, prometheus hepsi `up`. Firing alarm 0.
 8. **Geri alma:** Eski imaj `dwh-db-monitor-dwh-monitor:rollback-20261125` olarak etiketli. Bu imajda sabit bir parola varsayılanı var; stabil çalışma sonrası silinecek.
-9. **Açık kalanlar:** Parolaların döndürülmesi (apache, etl_svc, SMTP, Postgres); Alertmanager alıcısı (`localhost:5001` gerçek alıcı değil); K-02 Vault kararı; PR #3 (staging MSSQL) ve PR #8 (`helm lint`) için doğrulama; PR #15 CI düzeltmesi.
+9. **Açık kalanlar:** Parolaların döndürülmesi (apache, etl_svc, SMTP, Postgres); Alertmanager alıcısı (`localhost:5001` gerçek alıcı değil); K-02 Vault kararı; PR #3 (staging MSSQL) için doğrulama; PR #15 CI düzeltmesi.
+10. **PR #8 (Helm) birleşti (`55c6c2c`):** Helm lint ve template CI job'ı eklendi, yerelde ve CI'da geçti. Render çıktısındaki kimlik satırları yer tutucu. Doğrulayıcı PASS_WITH_NOTES.
+11. **PR #20 (JSONL export) birleşti:** Eski "son 1 saat" penceresi, aynı saatteki turlarda satır tekrarına yol açıyordu. Gerçek PostgreSQL'de eski kod 53 satır, yeni kod 28 satır (olması gereken 28) üretti. Doğrulayıcı PASS_WITH_NOTES.
+12. **PR #19 (md güncellemesi) birleşti (`06e5915`).** Doğrulayıcı PASS_WITH_NOTES; sunucu tarafı iddiaları ayrıca SSH ile doğrulandı.
+13. **İç adres temizliği:** `docs/config`, `helm/files/config`, `README.md`, `config/databases.example.yaml`, `config/notifications.yaml` içindeki iç IP'ler ve kurumsal adresler yer tutucuya çevrildi. `tests/` ve `scripts/vault-init.py` bilerek değiştirilmedi (test fixture ve kod).
 
 ### Bulgular
 - Sır dosyaları git'ten çıkarıldı (`587146d`), ama repo herkese açık ve geçmişte düz metin parolalar hâlâ var. Döndürme olmadan geçmiş temizliği bir koruma değildir.

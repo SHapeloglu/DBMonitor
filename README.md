@@ -171,7 +171,7 @@ databases:
 
   - name: prod-mssql
     adapter: adapters.mssql_adapter.MSSQLAdapter
-    host: 10.0.0.5
+    host: <DB_HOST>
     port: 1433
     db_name: DWH_PROD
     db_type: mssql
@@ -313,7 +313,7 @@ class TeradataAdapter(DBAdapter):
 ```yaml
   - name: prod-teradata
     adapter: adapters.teradata_adapter.TeradataAdapter
-    host: 10.0.0.10
+    host: <DB_HOST>
     db_type: teradata
     enabled: true
     credentials:
