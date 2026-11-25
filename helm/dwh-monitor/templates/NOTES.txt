@@ -1,0 +1,18 @@
+dwh-monitor {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+
+Image:  {{ include "dwh-monitor.image" . }}
+Service: {{ include "dwh-monitor.fullname" . }}:{{ .Values.service.port }}
+
+Check the service:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "dwh-monitor.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl -s http://127.0.0.1:{{ .Values.service.port }}/health
+
+{{- if not .Values.config.existingConfigMap }}
+
+WARNING: the chart is using the sanitized default config (files/config/).
+All monitored databases are disabled and credentials are REPLACE_ME.
+Create your own ConfigMap and set config.existingConfigMap for real monitoring.
+{{- end }}
+
+Secret: the pod reads DB_PASS from Secret "{{ .Values.existingSecret }}" (key DB_PASS).
+Make sure it exists in this namespace before the pod starts.

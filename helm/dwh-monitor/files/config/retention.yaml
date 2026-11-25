@@ -1,0 +1,5 @@
+active_months: 24
+archive_backend: local
+archive_path: /opt/dwh-db-monitor/archive
+batch_size: 10000
+dry_run: false
