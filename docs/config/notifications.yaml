@@ -13,13 +13,13 @@ notifications:
   - channel: smtp
     enabled: false              # Gerçek SMTP bilgisi girince true yap
     threshold: "severity >= 3"
-    smtp_host: mail.kurum.com
+    smtp_host: <SMTP_SUNUCU>
     smtp_port: 587
-    smtp_user: dwh-monitor@kurum.com
+    smtp_user: <GONDEREN_ADRES>
     smtp_password: changeme
-    from: dwh-monitor@kurum.com
+    from: <GONDEREN_ADRES>
     to:
-      - dwh-team@kurum.com
+      - <ALICI_ADRES>
 
   # ---------------------------------------------------------------------------
   # Slack — severity=2+ uyarılar için

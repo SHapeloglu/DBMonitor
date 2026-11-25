@@ -2,13 +2,13 @@ notifications:
   - channel: smtp
     enabled: false
     threshold: "severity >= 3"
-    smtp_host: mail.kurum.com
+    smtp_host: <SMTP_SUNUCU>
     smtp_port: 587
     smtp_user: REPLACE_ME   # override via external ConfigMap/Secret; never commit real values
     smtp_password: REPLACE_ME   # override via external ConfigMap/Secret; never commit real values
-    from: dwh-monitor@kurum.com
+    from: <GONDEREN_ADRES>
     to:
-      - dwh-team@kurum.com
+      - <ALICI_ADRES>
 
   - channel: slack_webhook
     enabled: false
