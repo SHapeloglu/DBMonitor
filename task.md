@@ -82,7 +82,7 @@ Durum simgeleri: ⬜ Yapılmadı · 🔄 Devam ediyor · ✅ Tamamlandı · 🔴
 
 | # | Görev | Öncelik | Durum |
 |---|---|---|---|
-| F6-01 | Kubernetes Helm chart | Yüksek | ✅ PR #8 main'de (`55c6c2c`). CI'da `helm lint` ve `helm template` geçiyor; varsayılan `DB_USER` `apache`. Kümede (`helm install --dry-run`) test edilmedi |
+| F6-01 | Kubernetes Helm chart | Yüksek | ✅ PR #8 main'de (merge `66c3d48`, CI commit `55c6c2c`). CI'da `helm lint` ve `helm template` geçiyor; varsayılan `DB_USER` `apache`. Kümede (`helm install --dry-run`) test edilmedi |
 | F6-02 | 🔄 Secrets yönetimi — Vault | Yüksek | 🔄 Düz metin git'ten çıktı (PR #18, `587146d`); compose parolaları `.env`'den okuyor (2026-11-25 dağıtım). Vault dev modda, sunucuda durdurulmuş; prod Vault kararı (K-02) ve döndürme bekliyor. F0-03 ile birleştirildi (tekrar eden satır). |
 | F6-03 | Grafana dashboard JSON | Orta | ⬜ Deferred |
 | F6-04 | ✅ Prometheus alert rules | Orta | ✅ Tamamlandı (6 alert rule, Alertmanager UP). Kurallar değere göre ve pencereli (`last_over_time(...[70m])`, `absent_over_time`); PR #11 (MERGED), `config/prometheus/rules/dwh-health.yml` |
@@ -133,7 +133,7 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 4. **PR #15:** taslak kalır; CI düzeltmesi ve ikinci bağımsız doğrulama bekliyor. Kapsam kararı (devam / kapatma) bekleniyor.
 5. **Helm kümede test:** `helm install --dry-run` bir Kubernetes kümesinde yapılmalı (CI'da yok).
 6. **`arsiv_tarihi` indeksi:** export sorgusu tam tarama yapabilir (PR #20 doğrulayıcı notu). Veri büyüdükçe indeks değerlendirilmeli.
-6. **K-02 kararı:** kalıcı üretim Vault mı, Vault'u kaldırmak mı (Vault dev modda, sunucuda durdurulmuş).
+7. **K-02 kararı:** kalıcı üretim Vault mı, Vault'u kaldırmak mı (Vault dev modda, sunucuda durdurulmuş).
 7. **Alertmanager alıcısı:** `config/alertmanager.yml` `localhost:5001`; gerçek bir alıcı (Slack/e-posta) gerekli. Gizli değerler `.env`'e girer, dokümana değil.
 8. **`_export_local` 1 saat penceresi:** uzun süren arşiv işlerinde erken batch'ler JSONL'a yazılmayabilir. Ayrı bir düzeltme olarak ele alınmalı.
 9. **Disk (%92, 17 GB boş):** restic politikası mevcut (`/opt/yedek/restic_yedek.sh`, gece `forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune`). Disk baskısının kaynağı başka projelerin verileri ve imajları; onlara dokunulmaz.
@@ -181,7 +181,7 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 | 2026-11-25 | Sunucu dağıtımı (`origin/main` `b0c0e5c`) | Dağıtım öncesi yedek `/root/yedekler/pre-deploy-20261125-1308`; `.env`'e `DQ_DB_PASSWORD`; yalnızca `dwh-monitor` yeniden build; `persist_ok: true`; Prometheus 3/3 up; 6 kural yüklü; firing alarm 0. Parolalar değişmedi |
 | 2026-11-25 | PR #3 / #8 CI ve düzeltmeler | Dallar `origin/main` ile birleştirilip CI tetiklendi (`5582b78`, `ddea741`); helm `DB_USER` `apache` (`df64bce`); PR açıklamalarına doğrulama eksikleri yazıldı |
 | 2026-11-25 | PR #5 kapatıldı | PR #18 ile değiştirildi |
-| 2026-11-25 | PR #8 Helm chart | `55c6c2c` (CI: `helm lint` + `helm template`), `55c6c2c` merge; doğrulayıcı PASS_WITH_NOTES |
+| 2026-11-25 | PR #8 Helm chart | merge `66c3d48` (CI commit `55c6c2c`: `helm lint` + `helm template`); doğrulayıcı PASS_WITH_NOTES |
 | 2026-11-25 | PR #20 JSONL export düzeltmesi | Aynı saatteki turlarda satır tekrarı giderildi (gerçek PostgreSQL: 53 → 28); doğrulayıcı PASS_WITH_NOTES |
 | 2026-11-25 | Doküman durumu (PR #19) | Md dosyaları `b0c0e5c` durumuna göre güncellendi, doğrulayıcı PASS_WITH_NOTES |
 | 2026-11-25 | İç adres temizliği | `docs/config`, `helm/files/config`, `README.md`, `config/databases.example.yaml`, `config/notifications.yaml`: IP ve kurumsal adresler yer tutucuya çevrildi |
