@@ -26,21 +26,35 @@ class FakeCursor:
         return False
 
     def execute(self, sql, params=None):
+        self._last_sql = sql
+        if "SELECT NOW()" in sql:
+            # Tur başlangıç zamanı sorgusu: sayımları bozmaz, ayrı kaydedilir.
+            self._conn.now_queries += 1
+            return
         self._conn.executed.append(sql)
+        self._conn.calls.append((sql, params))
         if self._conn.rowcounts:
             self.rowcount = self._conn.rowcounts.pop(0)
         else:
             self.rowcount = 0
 
     def fetchone(self):
+        if "SELECT NOW()" in getattr(self, "_last_sql", ""):
+            return (self._conn.now,)
         return (self._conn.dry_run_count,)
+
+    def fetchall(self):
+        return []
 
 
 class FakeConn:
-    def __init__(self, rowcounts=None, dry_run_count=0):
+    def __init__(self, rowcounts=None, dry_run_count=0, now=None):
         self.rowcounts = list(rowcounts or [])
         self.dry_run_count = dry_run_count
+        self.now = now
         self.executed: list[str] = []
+        self.calls: list[tuple[str, object]] = []
+        self.now_queries = 0
         self.commits = 0
         self.rollbacks = 0
 
@@ -115,3 +129,19 @@ def test_batch_size_zero_is_rejected_at_load(tmp_path):
 
     with pytest.raises(ValueError, match="batch_size"):
         RetentionManager(config_path=str(cfg))
+
+
+def test_export_selects_only_rows_written_by_this_run(tmp_path):
+    started = datetime(2026, 11, 25, 12, 0, tzinfo=timezone.utc)
+    conn = FakeConn(rowcounts=[0], now=started)
+    rm = make_manager(batch_size=10)
+    rm.archive_backend = "local"
+    rm.archive_path = str(tmp_path)
+
+    rm._archive_old_rows(conn, CUTOFF)
+
+    assert conn.now_queries == 1
+    export_sql, export_params = conn.calls[-1]
+    assert "arsiv_tarihi >= %s" in export_sql
+    assert "INTERVAL" not in export_sql
+    assert export_params == (started,)
