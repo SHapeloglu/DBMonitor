@@ -20,8 +20,8 @@ databases:
     query_timeout_s: 30
     enabled: true
     credentials:
-      user: apache
-      password: dqpass          # prod'da Vault: vault://secret/dwh/postgresql
+      user: <KULLANICI>
+      password: <PAROLA>
 
   # ---------------------------------------------------------------------------
   # MSSQL Server — ODBC Driver 18 gerektirir
@@ -36,8 +36,8 @@ databases:
     query_timeout_s: 30
     enabled: false              # Gerçek bağlantı bilgisi gelince true yap
     credentials:
-      user: etl_svc
-      password: changeme        # vault://secret/dwh/mssql
+      user: <KULLANICI>
+      password: <PAROLA>
 
   # ---------------------------------------------------------------------------
   # MySQL — Community Edition, pymysql driver
@@ -52,8 +52,8 @@ databases:
     query_timeout_s: 30
     enabled: false
     credentials:
-      user: etl_svc
-      password: changeme        # vault://secret/dwh/mysql
+      user: <KULLANICI>
+      password: <PAROLA>
 
   # ---------------------------------------------------------------------------
   # MariaDB — mysql_adapter.py paylaşılır, db_type: mariadb ile ayrışır
@@ -68,8 +68,8 @@ databases:
     query_timeout_s: 30
     enabled: false
     credentials:
-      user: etl_svc
-      password: changeme        # vault://secret/dwh/mariadb
+      user: <KULLANICI>
+      password: <PAROLA>
 
   # ---------------------------------------------------------------------------
   # Oracle — python-oracledb Thin mode (Oracle Client kurulumu gerekmez)
@@ -84,8 +84,8 @@ databases:
     query_timeout_s: 30
     enabled: false
     credentials:
-      user: etl_svc
-      password: changeme        # vault://secret/dwh/oracle
+      user: <KULLANICI>
+      password: <PAROLA>
 
   # ---------------------------------------------------------------------------
   # Generic ODBC — Fallback: tanınmayan / özel DB'ler
@@ -93,11 +93,11 @@ databases:
   # ---------------------------------------------------------------------------
   - name: generic-odbc-fallback
     adapter: adapters.generic_odbc_adapter.GenericODBCAdapter
-    connection_string: "Driver={ODBC Driver 18 for SQL Server};Server=.;Database=master;"
+    connection_string: "<BAGLANTI_DIZESI>"
     db_type: generic_odbc
     connect_timeout_s: 10
     query_timeout_s: 30
     enabled: false
     credentials:
-      user: etl_svc
-      password: changeme
+      user: <KULLANICI>
+      password: <PAROLA>
