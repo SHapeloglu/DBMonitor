@@ -117,9 +117,7 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 | PR | Dal | İçerik | Not |
 |---|---|---|---|
 | #3 | `fix/mssql-check-logic` | MSSQL DDM filtresi, yetki hatası, dinamik SQL | DRAFT. CI geçti (`5582b78`). Gerçek MSSQL ile test gerekli |
-| #15 | `chore/agent-scope-layer` | Alt ajanlar için kapsam koruyucusu | DRAFT. CI testi başarısız, doğrulayıcı FAIL |
-
-Kapatıldı: #5 (`chore/config-secrets-env`, yerine #18 birleşti).
+Kapatıldı: #5 (`chore/config-secrets-env`, yerine #18 birleşti). #15 (`chore/agent-scope-layer`, alt ajan kapsam koruyucusu): kapatıldı, CI başarısızdı ve doğrulayıcı FAIL verdi; dal korunuyor.
 
 Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, #7, #8, #9, #10, #11, #12, #13, #14, #16, #17, #18, #19, #20.
 
@@ -130,9 +128,10 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 1. **Döndürme (öncelik 1, DBA/sahip işi):** `apache`, `etl_svc`, SMTP kullanıcısı ve Postgres parolası (`DQ_DB_PASSWORD`). Tamamlanınca sunucuda `.env` güncellenip `dwh-monitor` yeniden başlatılır. Geçmiş commit'lerdeki eski kod sürümündeki parola varsayılanı ve eski parolalar da "ele geçirilmiş" sayılmalı.
 2. **Geri alma imajını sil:** `dwh-db-monitor-dwh-monitor:rollback-20261125` içinde sabit bir parola varsayılanı var. Yeni sürüm birkaç gün stabil çalıştıktan sonra silinecek (onaylı).
 3. **PR #3:** gerçek SQL Server (staging) testi, sonra birleştirme.
-4. **PR #15:** taslak kalır; CI düzeltmesi ve ikinci bağımsız doğrulama bekliyor. Kapsam kararı (devam / kapatma) bekleniyor.
-5. **Helm kümede test:** `helm install --dry-run` bir Kubernetes kümesinde yapılmalı (CI'da yok).
-6. **`arsiv_tarihi` indeksi:** export sorgusu tam tarama yapabilir (PR #20 doğrulayıcı notu). Veri büyüdükçe indeks değerlendirilmeli.
+4. **Helm kümede test:** `helm install --dry-run` bir Kubernetes kümesinde yapılmalı (CI'da yok).
+5. **`arsiv_tarihi` indeksi:** export sorgusu tam tarama yapabilir (PR #20 doğrulayıcı notu). Veri büyüdükçe indeks değerlendirilmeli.
+6. **Kalan `10.0.0.x` referansları:** `tests/` (fixture) ve `scripts/vault-init.py` (kod). Ayrı karar gerekir; düşük öncelik.
+7. **Alertmanager alıcısı:** `localhost:5001` yerine gerçek bir kanal (Slack veya e-posta) gerekli. Bilgi bekleniyor.
 7. **K-02 kararı:** kalıcı üretim Vault mı, Vault'u kaldırmak mı (Vault dev modda, sunucuda durdurulmuş).
 7. **Alertmanager alıcısı:** `config/alertmanager.yml` `localhost:5001`; gerçek bir alıcı (Slack/e-posta) gerekli. Gizli değerler `.env`'e girer, dokümana değil.
 8. **`_export_local` 1 saat penceresi:** uzun süren arşiv işlerinde erken batch'ler JSONL'a yazılmayabilir. Ayrı bir düzeltme olarak ele alınmalı.
