@@ -19,7 +19,7 @@ services:
     container_name: dq-postgres
     environment:
       POSTGRES_USER: apache
-      POSTGRES_PASSWORD: dqpass
+      POSTGRES_PASSWORD: <PAROLA>
       POSTGRES_DB: dwhmonitor
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -46,7 +46,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=dwhmonitor
       - DB_USER=apache
-      - DB_PASS=dqpass
+      - DB_PASS=<PAROLA>
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_TOKEN}
     depends_on:
