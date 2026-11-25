@@ -19,6 +19,7 @@ import logging
 import time
 from typing import Optional
 
+# TODO(kontrol): Aşağıdaki yorum 'preflight_check.py' dosyasından söz ediyor; depoda bu dosya görünmüyor. Doğrulanmalı.
 try:
     import pymysql
     import pymysql.cursors
@@ -33,6 +34,7 @@ from core.metric_schema import MetricSchema, Sonuc, Kategori
 
 logger = logging.getLogger(__name__)
 
+# Hassas veri olabilecek kolon adları (küçük harfle karşılaştırılır). Liste PostgreSQL adaptöründeki listeyle aynı tutulmalıdır.
 HASSAS_KOLONLAR = [
     "password", "parola", "sifre", "passwd",
     "credit_card", "kredi_kart", "kart_no",
@@ -40,6 +42,7 @@ HASSAS_KOLONLAR = [
     "token", "secret", "api_key",
 ]
 
+# Bu sayıdan büyük tablolarda NULL taraması yapılmaz: her kolon için tam tablo sayımı çok yavaştır. 500 bin satır, performans ile kapsam arasında pratik bir dengedir.
 NULL_SCAN_ROW_LIMIT = 500_000
 
 
@@ -49,10 +52,12 @@ class MySQLAdapter(DBAdapter):
     ADAPTER_VERSION = "1.0.0"
 
     def __init__(self, config: dict):
+        """config: databases.yaml ayar sözlüğü. Bağlantı nesnesi başta None'dır."""
         super().__init__(config)
         self._conn: Optional[object] = None
 
     def connect(self) -> None:
+        """MySQL/MariaDB'ye bağlanır. pymysql kurulu değilse ConnectionError fırlatır. Hata türü mesaj metnine göre ayrılır: erişim reddi AuthenticationError, zaman aşımı TimeoutError, diğerleri ConnectionError. autocommit açıktır."""
         if pymysql is None:
             raise ConnectionError(
                 "pymysql yüklü değil. 'pip install pymysql' çalıştırın.",
@@ -76,6 +81,7 @@ class MySQLAdapter(DBAdapter):
             logger.info("MySQL/MariaDB bağlantısı kuruldu: %s:%s/%s (db_type=%s)",
                         self.host, self.port, self.db_name, self.db_type)
         except pymysql.err.OperationalError as exc:
+            # MySQL hata metni: 'Access denied' kimlik hatası, 'timed out' zaman aşımı anlamına gelir.
             msg = str(exc).lower()
             if "access denied" in msg or "password" in msg:
                 raise AuthenticationError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
@@ -86,6 +92,7 @@ class MySQLAdapter(DBAdapter):
             raise ConnectionError(str(exc), db_type=self.db_type, host=self.host, cause=exc)
 
     def disconnect(self) -> None:
+        """Bağlantıyı kapatır. Hata olursa uyarı yazılır; _conn her durumda None yapılır."""
         try:
             if self._conn:
                 self._conn.close()
@@ -95,6 +102,7 @@ class MySQLAdapter(DBAdapter):
             self._conn = None
 
     def health_check(self) -> HealthResult:
+        """SELECT 1 ile yanıt süresini ölçer. Hata olursa exception fırlatmadan is_healthy=False döner."""
         try:
             t0 = time.perf_counter()
             with self._conn.cursor() as cur:
@@ -106,6 +114,7 @@ class MySQLAdapter(DBAdapter):
             return HealthResult(is_healthy=False, latency_ms=0, message=str(exc))
 
     def get_metadata(self) -> DBMetadata:
+        """MySQL/MariaDB sürümünü (SELECT VERSION()) okuyup DBMetadata olarak döner."""
         with self._conn.cursor() as cur:
             cur.execute("SELECT VERSION()")
             version = cur.fetchone()[0]
@@ -119,6 +128,7 @@ class MySQLAdapter(DBAdapter):
         )
 
     def collect_metrics(self) -> list[MetricSchema]:
+        """Tüm kontrolleri sırayla çalıştırır. Her kontrol _safe_collect ile sarılır; biri hata verse de diğerleri çalışır."""
         metrics = []
         checks = [
             (self._check_unused_tables,     "FR-COST-01"),
@@ -135,6 +145,8 @@ class MySQLAdapter(DBAdapter):
         return metrics
 
     def _check_unused_tables(self) -> list[MetricSchema]:
+        """FR-COST-01: 30 gündür güncellenmemiş (UPDATE_TIME) ya da hiç güncellenmemiş tabloları bulur. Büyükten küçüğe en fazla 20 tablo listelenir."""
+        # UPDATE_TIME, InnoDB'de sunucu yeniden başlayınca sıfırlanabilir. Bu yüzden 'hiç güncellenmemiş' sonucu kesin değildir.
         sql = """
             SELECT
                 CONCAT(TABLE_SCHEMA, '.', TABLE_NAME) AS tablo,
@@ -172,6 +184,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_table_fragmentation(self) -> list[MetricSchema]:
+        """FR-COST-02: Boş alanı (DATA_FREE) 100 MB üzerinde ve oranı %20'yi aşan tabloları bulur. Oran %40'ı aşarsa önem derecesi 3 olur."""
+        # DATA_FREE: silinmiş ama işletim sistemine geri verilmemiş boş alan. Büyük ve oranı yüksek tablolar fragmantasyon sayılır.
         sql = """
             SELECT
                 CONCAT(TABLE_SCHEMA, '.', TABLE_NAME) AS tablo,
@@ -208,6 +222,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_unpartitioned(self) -> list[MetricSchema]:
+        """FR-COST-03: 1 GB üzeri ve hiç partition'ı olmayan tabloları listeler."""
+        # 1 GB (1024*1024*1024 bayt) üzeri ve hiç partition'ı olmayan tablolar.
         sql = """
             SELECT
                 CONCAT(TABLE_SCHEMA, '.', TABLE_NAME) AS tablo,
@@ -245,6 +261,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_null_ratio(self) -> list[MetricSchema]:
+        """FR-DQ-01: Sadece NULL'a izin veren kolonları ve 500 bin satırdan küçük tabloları tarar. Her kolon için NULL sayısını sayar; oranı %50'yi geçen kolonlar raporlanır. Bir kolonda hata olursa uyarı yazılır ve devam edilir. Bu kontrol pahalıdır."""
+        # Bu kontrol en pahalı olanlardan biridir: her kolon için tabloyu tarar. Bu yüzden önce küçük ve boş olmayan tablolar seçilir (1 ile 500 bin satır arası).
         tablo_sql = """
             SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS
             FROM information_schema.TABLES
@@ -269,6 +287,7 @@ class MySQLAdapter(DBAdapter):
             kolonlar = self._fetchall(kolon_sql, (schema, tablo))
             for (kolon,) in kolonlar:
                 try:
+                    # Tablo ve kolon adları information_schema'dan gelir, kullanıcıdan gelmez. Yine de backtick içine alınır. DİKKAT: Ad içinde backtick olursa bu sorgu bozulur.
                     check_sql = f"""
                         SELECT
                             COUNT(*) AS toplam,
@@ -293,6 +312,7 @@ class MySQLAdapter(DBAdapter):
                                 etkilenen_obje = f"{schema}.{tablo}.{kolon}",
                                 detay          = f"NULL oranı: %{pct}",
                             ))
+                # Bir kolon taranamazsa (yetki, veri tipi vb.) sadece uyarı yazılır, diğer kolonlar taranmaya devam eder.
                 except Exception as exc:
                     logger.warning("FR-DQ-01 kolon tarama hatası %s.%s.%s: %s", schema, tablo, kolon, exc)
         if not results:
@@ -300,6 +320,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_duplicates(self) -> list[MetricSchema]:
+        """FR-DQ-02: PK veya UNIQUE kısıtı olmayan, kayıt içeren tabloları bulur. Kontrol adına rağmen tekrar kaydı aramaz; sadece kısıt eksikliğine bakar."""
+        # TABLE_ROWS InnoDB istatistiğinden gelen tahmindir; kesin kayıt sayısı değildir.
         sql = """
             SELECT
                 CONCAT(t.TABLE_SCHEMA, '.', t.TABLE_NAME) AS tablo,
@@ -339,6 +361,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_daily_load(self) -> list[MetricSchema]:
+        """FR-PIPE-01: 10.000'den fazla satırı olan ama bugün güncellenmemiş tabloları bulur. UPDATE_TIME güvenilir olmadığı için sonuç kesin değildir."""
+        # DİKKAT: Kontrol adı 'gunluk_yukleme' olsa da bu sorgu UPDATE_TIME'a bakar. InnoDB'de UPDATE_TIME güvenilir olmadığı için sonuçlar yanıltıcı olabilir.
         sql = """
             SELECT
                 CONCAT(TABLE_SCHEMA, '.', TABLE_NAME) AS tablo,
@@ -377,6 +401,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_sensitive_columns(self) -> list[MetricSchema]:
+        """FR-SEC-01: HASSAS_KOLONLAR listesindeki adları information_schema.COLUMNS içinde arar. Sadece kolon adına bakar, veriye bakmaz."""
+        # Her kolon adı için bir %s yer tutucusu üretilir. Değerler parametre olarak gönderilir, böylece SQL enjeksiyonu önlenir.
         placeholders = ",".join(["%s"] * len(HASSAS_KOLONLAR))
         sql = f"""
             SELECT
@@ -410,6 +436,8 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _check_long_queries(self) -> list[MetricSchema]:
+        """FR-USER-01: information_schema.PROCESSLIST üzerinden 60 saniyeden uzun süren sorguları bulur. Bu görünüme erişim yetkisi yoksa kontrol atlanır."""
+        # COMMAND = 'Query' ve TIME > 60: 60 saniyeden uzun süren sorgular. Boşta bekleyen 'Sleep' bağlantıları sayılmaz.
         sql = """
             SELECT
                 ID,
@@ -424,6 +452,7 @@ class MySQLAdapter(DBAdapter):
             ORDER BY TIME DESC
             LIMIT 10
         """
+        # DİKKAT: PROCESSLIST yetkisi yoksa kontrol hata vermeden OK döner. Bu durumda 'sorun yok' sonucu yanıltıcı olabilir.
         try:
             rows = self._fetchall(sql)
         except Exception:
@@ -449,16 +478,19 @@ class MySQLAdapter(DBAdapter):
         return results
 
     def _fetchall(self, sql: str, params: tuple = ()) -> list:
+        """SQL'i çalıştırır ve tüm satırları liste olarak döner. Kontrol metotlarının ortak yardımcısıdır."""
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchall()
 
     def _fetchone(self, sql: str, params: tuple = ()):
+        """SQL'i çalıştırır ve tek satır döner (sonuç yoksa None). Kontrol metotlarının ortak yardımcısıdır."""
         with self._conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchone()
 
     def _ok(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Bir kontrolün sorunsuz olduğunu gösteren OK kaydı üretir. OK kaydında severity her zaman 1 olmalıdır."""
         return MetricSchema(
             db_type      = self.db_type,
             host         = self.host,
