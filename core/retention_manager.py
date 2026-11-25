@@ -45,6 +45,9 @@ class RetentionManager:
         self.archive_path     = "/opt/dwh-db-monitor/archive"
         self.batch_size       = 10_000
         self.dry_run          = False
+        # Bu arşiv turunun başlangıç zamanı (DB saati). Export yalnızca bu zamandan
+        # sonra arşive yazılan satırları alır; böylece her tur kendi satırlarını yazar.
+        self._run_started_at  = None
 
         if self._config_path.exists():
             self._load_config()
@@ -142,6 +145,12 @@ class RetentionManager:
                 )
                 return cur.fetchone()[0]
 
+        # Tur başlangıcı: bu tur arşive yazılan tüm satırlar bu zamandan sonra
+        # arsiv_tarihi alır (her batch NOW() ile daha sonra commit edilir).
+        with conn.cursor() as cur:
+            cur.execute("SELECT NOW()")
+            self._run_started_at = cur.fetchone()[0]
+
         total = 0
         while True:
             with conn.cursor() as cur:
@@ -226,9 +235,13 @@ class RetentionManager:
         month_str = cutoff.strftime("%Y%m")
         out_path  = archive_dir / f"dwh_health_{month_str}.jsonl.gz"
 
+        # Yalnızca bu turda arşive yazılan satırlar. Eski "son 1 saat" penceresi,
+        # aynı saat içindeki turların satırlarını tekrar yazıyor ve uzun turlarda
+        # erken batch'leri dışarıda bırakıyordu.
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "SELECT * FROM monitor.dwh_health_log_archive WHERE arsiv_tarihi >= NOW() - INTERVAL '1 hour'",
+                "SELECT * FROM monitor.dwh_health_log_archive WHERE arsiv_tarihi >= %s",
+                (self._run_started_at,),
             )
             rows = cur.fetchall()
 
