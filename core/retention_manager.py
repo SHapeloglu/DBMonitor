@@ -58,6 +58,10 @@ class RetentionManager:
         self.archive_backend = cfg.get("archive_backend", "local")
         self.archive_path    = cfg.get("archive_path", "/opt/dwh-db-monitor/archive")
         self.batch_size      = cfg.get("batch_size", 10_000)
+        # 0 veya negatif değerde archive döngüsü hiç bitmez (batch < batch_size
+        # hiçbir zaman doğru olmaz), bu yüzden yüklemede reddedilir.
+        if not isinstance(self.batch_size, int) or self.batch_size < 1:
+            raise ValueError(f"batch_size pozitif tam sayı olmalı, alınan: {self.batch_size!r}")
         self.dry_run         = cfg.get("dry_run", False)
         logger.info(
             "RetentionManager config: active_months=%d, backend=%s, dry_run=%s",
