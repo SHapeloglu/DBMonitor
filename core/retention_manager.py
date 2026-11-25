@@ -58,6 +58,10 @@ class RetentionManager:
         self.archive_backend = cfg.get("archive_backend", "local")
         self.archive_path    = cfg.get("archive_path", "/opt/dwh-db-monitor/archive")
         self.batch_size      = cfg.get("batch_size", 10_000)
+        # 0 veya negatif değerde archive döngüsü hiç bitmez (batch < batch_size
+        # hiçbir zaman doğru olmaz), bu yüzden yüklemede reddedilir.
+        if not isinstance(self.batch_size, int) or self.batch_size < 1:
+            raise ValueError(f"batch_size pozitif tam sayı olmalı, alınan: {self.batch_size!r}")
         self.dry_run         = cfg.get("dry_run", False)
         logger.info(
             "RetentionManager config: active_months=%d, backend=%s, dry_run=%s",
@@ -91,12 +95,13 @@ class RetentionManager:
             archived = self._archive_old_rows(conn, cutoff)
             result["archived"] = archived
 
-            # 2. Aktif tablodan sil
+            # 2. Taşıma (_archive_old_rows) silme ile aynı CTE'de yapılır: her satır
+            #    aktif tablodan silinip arşive eklenir, dolayısıyla silinen sayısı
+            #    taşınan sayıya eşittir.
             if not self.dry_run:
-                deleted = self._delete_old_rows(conn, cutoff)
-                result["deleted"] = deleted
+                result["deleted"] = archived
                 conn.commit()
-                logger.info("Retention tamamlandı: %d arşivlendi, %d silindi.", archived, deleted)
+                logger.info("Retention tamamlandı: %d arşivlendi, %d silindi.", archived, archived)
             else:
                 conn.rollback()
                 logger.info("[DRY RUN] %d kayıt arşivlenecekti.", archived)
@@ -120,19 +125,13 @@ class RetentionManager:
     # ------------------------------------------------------------------
 
     def _archive_old_rows(self, conn, cutoff: datetime) -> int:
-        """Eski kayıtları dwh_health_log_archive'e kopyala."""
-        sql = """
-            INSERT INTO monitor.dwh_health_log_archive
-                (kontrol_tarihi, db_type, host, db_name, kategori,
-                 kontrol_kodu, kontrol_adi, sonuc, severity,
-                 etkilenen_obje, etkilened_sayi, detay, arsiv_tarihi)
-            SELECT
-                kontrol_tarihi, db_type, host, db_name, kategori,
-                kontrol_kodu, kontrol_adi, sonuc, severity,
-                etkilenen_obje, etkilened_sayi, detay, NOW()
-            FROM monitor.dwh_health_log
-            WHERE kontrol_tarihi < %s
-            ON CONFLICT DO NOTHING
+        """
+        Eski kayıtları aktif tablodan arşive taşır.
+
+        Her batch tek bir SQL ifadesi (CTE): DELETE ... RETURNING satırları
+        siler, INSERT ise aynı satırları arşive yazar. Batch aynı transaction
+        içinde commit edilir; ayrı bir silme döngüsü yoktur. Dönen değer
+        aktif tablodan silinen (ve arşive yazılan) satır sayısıdır.
         """
         if self.dry_run:
             # Sadece sayı döndür
@@ -146,8 +145,20 @@ class RetentionManager:
         total = 0
         while True:
             with conn.cursor() as cur:
-                # Batch INSERT
-                cur.execute(f"""
+                # Tek ifade: silinen satırlar (RETURNING) doğrudan arşive eklenir.
+                # cur.rowcount, arşive eklenen (= aktif tablodan silinen) satır sayısıdır.
+                cur.execute("""
+                    WITH moved AS (
+                        DELETE FROM monitor.dwh_health_log
+                        WHERE id IN (
+                            SELECT id FROM monitor.dwh_health_log
+                            WHERE kontrol_tarihi < %s
+                            LIMIT %s
+                        )
+                        RETURNING kontrol_tarihi, db_type, host, db_name, kategori,
+                                  kontrol_kodu, kontrol_adi, sonuc, severity,
+                                  etkilenen_obje, etkilenen_sayi, detay
+                    )
                     INSERT INTO monitor.dwh_health_log_archive
                         (kontrol_tarihi, db_type, host, db_name, kategori,
                          kontrol_kodu, kontrol_adi, sonuc, severity,
@@ -156,10 +167,7 @@ class RetentionManager:
                         kontrol_tarihi, db_type, host, db_name, kategori,
                         kontrol_kodu, kontrol_adi, sonuc, severity,
                         etkilenen_obje, etkilenen_sayi, detay, NOW()
-                    FROM monitor.dwh_health_log
-                    WHERE kontrol_tarihi < %s
-                    LIMIT %s
-                    ON CONFLICT DO NOTHING
+                    FROM moved
                 """, (cutoff, self.batch_size))
                 batch = cur.rowcount
             total += batch
@@ -170,27 +178,6 @@ class RetentionManager:
 
         # Local/S3/Azure'a yaz
         self._export_to_backend(conn, cutoff)
-        return total
-
-    def _delete_old_rows(self, conn, cutoff: datetime) -> int:
-        """Archive'e taşınan eski kayıtları aktif tablodan sil."""
-        total = 0
-        while True:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    DELETE FROM monitor.dwh_health_log
-                    WHERE id IN (
-                        SELECT id FROM monitor.dwh_health_log
-                        WHERE kontrol_tarihi < %s
-                        LIMIT %s
-                    )
-                """, (cutoff, self.batch_size))
-                batch = cur.rowcount
-            total += batch
-            conn.commit()
-            if batch == 0:
-                break
-            logger.debug("Delete batch: %d kayıt silindi (toplam: %d)", batch, total)
         return total
 
     # ------------------------------------------------------------------
