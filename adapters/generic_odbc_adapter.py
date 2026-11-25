@@ -52,6 +52,7 @@ class GenericODBCAdapter(DBAdapter):
     ADAPTER_VERSION = "1.0.0"
 
     def __init__(self, config: dict):
+        """config: databases.yaml ayar sözlüğü. connection_string, dsn ve driver alanlarını okur."""
         super().__init__(config)
         self._conn: Optional[object] = None
         self._connection_string = config.get("connection_string", None)
@@ -62,6 +63,7 @@ class GenericODBCAdapter(DBAdapter):
     # Bağlantı
     # ------------------------------------------------------------------
     def connect(self) -> None:
+        """pyodbc ile bağlanır. Bağlantı metni _build_connection_string ile hazırlanır. Giriş hatası AuthenticationError, zaman aşımı TimeoutError, diğer hatalar ConnectionError olur."""
         if pyodbc is None:
             raise ConnectionError(
                 "pyodbc yüklü değil. 'pip install pyodbc' çalıştırın.",
@@ -120,6 +122,7 @@ class GenericODBCAdapter(DBAdapter):
         return ";".join(parts)
 
     def disconnect(self) -> None:
+        """Bağlantıyı kapatır. Hata olursa uyarı yazar; _conn her durumda None yapılır."""
         try:
             if self._conn:
                 self._conn.close()
@@ -129,6 +132,7 @@ class GenericODBCAdapter(DBAdapter):
             self._conn = None
 
     def health_check(self) -> HealthResult:
+        """SELECT 1 ile yanıt süresini ölçer. Hata olursa is_healthy=False döner."""
         try:
             t0 = time.perf_counter()
             cur = self._conn.cursor()
@@ -142,7 +146,9 @@ class GenericODBCAdapter(DBAdapter):
 
     def get_metadata(self) -> DBMetadata:
         # ANSI SQL — çoğu DB'de çalışır
+        """Üç farklı sürüm sorgusu denenir (MSSQL, MySQL/PostgreSQL, Oracle); ilk çalışan sonuç kullanılır. Hiçbiri çalışmazsa sürüm 'unknown' olur."""
         version = "unknown"
+        # Her sürüm sorgusu farklı veritabanında çalışır. Biri hata verirse hata yutulur ve sıradakine geçilir.
         for sql in [
             "SELECT @@VERSION",           # MSSQL, MySQL
             "SELECT VERSION()",           # MySQL, MariaDB, PostgreSQL
@@ -172,6 +178,7 @@ class GenericODBCAdapter(DBAdapter):
     # Ana toplama metodu
     # ------------------------------------------------------------------
     def collect_metrics(self) -> list[MetricSchema]:
+        """Üç kontrolü (FR-COST-03, FR-DQ-02, FR-SEC-01) sırayla çalıştırır. Her biri _safe_collect ile sarılır."""
         metrics = []
         checks = [
             (self._check_large_tables,      "FR-COST-03"),
@@ -189,6 +196,8 @@ class GenericODBCAdapter(DBAdapter):
     # ------------------------------------------------------------------
     def _check_large_tables(self) -> list[MetricSchema]:
         # Önce DATA_LENGTH destekli sürümü dene
+        """FR-COST-03: 1 GB'tan büyük tabloları bulur. Boyut bilgisi standart SQL'de olmadığı için önce boyutlu sorgu denenir. O da çalışmazsa boyut bilinmediği için uyarı üretilmez ve OK döner."""
+        # DATA_LENGTH standart olmadığı için bu sorgu bazı veritabanlarında hata verir. Hata olursa boyut bilgisiz sorguya düşülür.
         sql_with_size = """
             SELECT
                 TABLE_SCHEMA || '.' || TABLE_NAME AS tablo,
@@ -244,6 +253,7 @@ class GenericODBCAdapter(DBAdapter):
     # INFORMATION_SCHEMA.TABLE_CONSTRAINTS — geniş ODBC uyumluluğu
     # ------------------------------------------------------------------
     def _check_duplicates(self) -> list[MetricSchema]:
+        """FR-DQ-02: PK veya UNIQUE kısıtı olmayan tabloları bulur (en fazla 10). Kontrol adına rağmen tekrar kaydı aramaz."""
         sql = """
             SELECT
                 t.TABLE_SCHEMA || '.' || t.TABLE_NAME AS tablo
@@ -288,6 +298,8 @@ class GenericODBCAdapter(DBAdapter):
     # INFORMATION_SCHEMA.COLUMNS — evrensel
     # ------------------------------------------------------------------
     def _check_sensitive_columns(self) -> list[MetricSchema]:
+        """FR-SEC-01: Hassas adlı kolonları INFORMATION_SCHEMA.COLUMNS üzerinden bulur (en fazla 30). Veriye bakmaz."""
+        # Bu bir ? yer tutucusu değil, değerler doğrudan metne yazılıyor. Liste sabit (HASSAS_KOLONLAR) olduğu için güvenlidir; kullanıcı girdisi buraya gelmez.
         placeholders = ",".join(f"'{k}'" for k in HASSAS_KOLONLAR)
         sql = f"""
             SELECT
@@ -329,6 +341,7 @@ class GenericODBCAdapter(DBAdapter):
     # Yardımcı metodlar
     # ------------------------------------------------------------------
     def _fetchall(self, sql: str, params: tuple = ()) -> list:
+        """SQL'i parametrelerle çalıştırıp tüm satırları döner. İmleç iş bitince kapatılır."""
         cur = self._conn.cursor()
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -336,6 +349,7 @@ class GenericODBCAdapter(DBAdapter):
         return rows
 
     def _ok(self, kod: str, ad: str, detay: str) -> MetricSchema:
+        """Bir kontrolün sorunsuz olduğunu gösteren OK kaydı üretir. OK kaydında severity her zaman 1 olmalıdır."""
         return MetricSchema(
             db_type      = self.db_type,
             host         = self.host,

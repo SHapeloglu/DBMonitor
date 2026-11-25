@@ -20,3 +20,6 @@ archive/
 # Backups
 *.bak
 *.backup
+
+# Secrets (gerçek değerler; örnek: config/databases.example.yaml)
+config/databases.yaml
