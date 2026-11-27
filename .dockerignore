@@ -2,6 +2,11 @@
 .gitignore
 .env
 .env.*
+# Gerçek yapılandırma (sır içerir). Çalışma zamanında compose ./config dizinini bağlar;
+# imaja girmemeli. Örnek: config/databases.example.yaml (yer tutucu).
+config/databases.yaml
+config/notifications.yaml
+.claude/
 __pycache__/
 *.pyc
 archive/
