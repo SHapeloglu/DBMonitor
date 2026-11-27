@@ -120,14 +120,14 @@ Karşılaştırılacak ürünler: Datadog, Grafana, SolarWinds, OpsRamp ve diğe
 
 Kapatıldı: #5 (`chore/config-secrets-env`, yerine #18 birleşti). #15 (`chore/agent-scope-layer`, alt ajan kapsam koruyucusu): kapatıldı, CI başarısızdı ve doğrulayıcı FAIL verdi; dal korunuyor.
 
-Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, #7, #8, #9, #10, #11, #12, #13, #14, #16, #17, #18, #19, #20.
+Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, #7, #8, #9, #10, #11, #12, #13, #14, #16, #17, #18, #19, #20, #21, #22, #23 (#21–#23: 2026-11-27).
 
 ---
 
 ## Sonraki oturumda yapılacaklar
 
 1. **Döndürme (öncelik 1, DBA/sahip işi):** `apache`, `etl_svc`, SMTP kullanıcısı ve Postgres parolası (`DQ_DB_PASSWORD`). Tamamlanınca sunucuda `.env` güncellenip `dwh-monitor` yeniden başlatılır. Geçmiş commit'lerdeki eski kod sürümündeki parola varsayılanı ve eski parolalar da "ele geçirilmiş" sayılmalı.
-2. **Geri alma imajını sil:** `dwh-db-monitor-dwh-monitor:rollback-20261125` içinde sabit bir parola varsayılanı var. Yeni sürüm birkaç gün stabil çalıştıktan sonra silinecek (onaylı).
+2. **Geri alma imajı (ertelendi, kullanıcı kararı 2026-11-27):** `dwh-db-monitor-dwh-monitor:rollback-20261125` bu aşamada silinmiyor. İçinde eski `databases.yaml` ve sabit parola varsayılanı var; döndürmeden sonra yeniden değerlendirilecek.
 3. **PR #3:** gerçek SQL Server (staging) testi, sonra birleştirme.
 4. **Helm kümede test:** `helm install --dry-run` bir Kubernetes kümesinde yapılmalı (CI'da yok).
 5. **`arsiv_tarihi` indeksi:** export sorgusu tam tarama yapabilir (PR #20 doğrulayıcı notu). Veri büyüdükçe indeks değerlendirilmeli.
@@ -139,6 +139,7 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 11. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula; sunucudan doğrulanamıyor.
 12. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle.
 13. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik).
+14. **origin/main → sunucu senkronu (onay bekliyor):** Fark 10 commit / 28 dosya (PR #20, #21, #22, helm, CI helm işi, doküman). `config/notifications.yaml` yer tutucuya dönecek: sunucudaki SMTP ayarları (sır değil) önce yedeklenmeli. Adımlar: yedek, fark incelemesi, `promtool`/`compose config` kontrolü, `dwh-monitor` yeniden build ve oluşturma, sağlık kontrolü.
 
 ---
 
@@ -177,6 +178,8 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 | 2026-11-25 | PR #2 retention (tek CTE) | `b0c0e5c`: birim testleri (`tests/test_retention_manager.py`), `batch_size` doğrulaması, gerçek PostgreSQL doğrulaması. Doğrulayıcı PASS_WITH_NOTES |
 | 2026-11-25 | PR #18 sır dosyaları | `587146d`: `config/databases.yaml` git'ten çıktı, örnek ve dokümanlar yer tutucu, `tests/test_config_example.py` |
 | 2026-11-25 | Sunucu dağıtımı (`origin/main` `b0c0e5c`) | Dağıtım öncesi yedek `/root/yedekler/pre-deploy-20261125-1308`; `.env`'e `DQ_DB_PASSWORD`; yalnızca `dwh-monitor` yeniden build; `persist_ok: true`; Prometheus 3/3 up; 6 kural yüklü; firing alarm 0. Parolalar değişmedi |
+| 2026-11-27 | F14 partition 2027 | `dwh_health_log_2027_01`…`_12` eklendi (`add_monthly_partition`, idempotent); transaction içi yazma testi geri alındı |
+| 2026-11-27 | PR #23 `.dockerignore` | Gerçek yapılandırma ve `.claude/` imaja girmiyor (`900068f`); sunucuda yalnızca imaj yeniden build edildi (mevcut kod, `d2d51d13`) |
 | 2026-11-25 | PR #3 / #8 CI ve düzeltmeler | Dallar `origin/main` ile birleştirilip CI tetiklendi (`5582b78`, `ddea741`); helm `DB_USER` `apache` (`df64bce`); PR açıklamalarına doğrulama eksikleri yazıldı |
 | 2026-11-25 | PR #5 kapatıldı | PR #18 ile değiştirildi |
 | 2026-11-25 | PR #8 Helm chart | merge `66c3d48` (CI commit `55c6c2c`: `helm lint` + `helm template`); doğrulayıcı PASS_WITH_NOTES |
