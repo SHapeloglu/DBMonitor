@@ -33,7 +33,7 @@ Fazlara bölünmüş planlı iş `task.md`'de (Faz 0–6, açık kararlar K-01�
 Kaynak: doğrulayıcı kararları (V1–V5), 2026-11-14. Bu F-kodları `task.md`'de yok. Biçim: kod — özet — ciddiyet — karar/durum.
 
 - **F05** — Prometheus scrape işinde `X-API-Key` başlığı yok; `API_KEY` tanımlanırsa `/metrics` 401 verir — orta — CONFIRMED, açık.
-- **F14** — Partition yalnızca 2026-12'ye kadar elle tanımlı, DEFAULT partition yok; `add_monthly_partition` sadece retention'dan çağrılıyor — yüksek — CONFIRMED, açık.
+- **F14** — Partition yalnızca 2026-12'ye kadar elle tanımlı, DEFAULT partition yok; `add_monthly_partition` sadece retention'dan çağrılıyor — yüksek — CONFIRMED. ✅ 2026-11-27: 2027_01…2027_12 eklendi (idempotent prosedür). Açık: 2028 ve sonrası için kalıcı ileri-partition kuralı (ayrı PR).
 - **F15** — Vault boş sözlük dönerse `credentials` `vault://...` dizesi olarak kalır, adapter yine yüklenir — düşük — CONFIRMED, açık.
 - **F16** — Bildirimde dedup/cooldown yok; her toplama turunda aynı uyarı tekrar gönderilir — orta — CONFIRMED, açık.
 - **F17** — `ts` naive `utcnow` ile dolduruluyor, `timestamp()` yerel saat sayar; saat dilimi kayması riski — düşük — PLAUSIBLE, açık.

@@ -3,6 +3,25 @@
 > Sıra: en yeni oturum en üstte. 11. ve 12. oturumlardaki "Sonraki" listeleri o günün durumudur; güncel liste `task.md`'dedir.
 > Not: numaralar 2026-08 kayıtlarında çakışıyordu; ayırt için harf eklendi (11a, 11b, 12a, 12b).
 
+## Oturum 16 — F14 partition, .dockerignore düzeltmesi (PR #23), sunucu imaj dağıtımı, senkron planı (2026-11-27)
+
+### Yapılanlar
+1. **F14 (partition):** `dwh_health_log` için yalnızca 2026-12'ye kadar partition vardı; yeni ay partition'ı yalnızca retention'ın ayın 1'inde çalışmasına bağlıydı. `monitor.add_monthly_partition` ile `dwh_health_log_2027_01` … `_2027_12` eklendi (prosedür idempotent). Partition sayısı 24 → 36. Transaction içinde 2027-06 tarihli test satırı yazılıp geri alındı (count 0), `/health` ok.
+2. **`.dockerignore` (PR #23, `900068f`, CI dört iş yeşil):** `config/databases.yaml`, `config/notifications.yaml` ve `.claude/` imaja girmiyordu. Sunucuda sahte dosyalarla geçici build bağlamında doğrulandı.
+3. **Sunucu imajı (onaylı, dar kapsam):** Yalnızca `.dockerignore` `origin/main` sürümüyle değiştirildi (önceki hali `/root/yedekler/pre-deploy-20261125-1308/dockerignore.before-20261127`). Kod aynı kaldı: `docker compose build dwh-monitor` → yeni imaj `d2d51d13`, `up -d --no-build dwh-monitor`. İmajda `databases.yaml`, `notifications.yaml`, `.env`, `.claude` yok. `/health` ok, `persist_ok: true`, Prometheus 3/3 up. Yeniden oluşturma sırasında kısa bir DNS hatası oldu, kendiliğinden düzeldi.
+4. **Silme konusu kapatıldı (kullanıcı kararı):** `rollback-20261125` imajı silinmedi.
+5. **Fark analizi (`b0c0e5c..origin/main`):** Önceki varsayımın aksine PR #6–#18 zaten sunucudaki commit'te. Fark yalnızca 10 commit / 28 dosya: PR #20 (retention export), #21 (yer tutucu adresler), #22 (task), #23 (.dockerignore), helm chart, CI helm işi, doküman. Sunucuda izlenen `config/notifications.yaml` `origin/main`'de yer tutucuya dönecek; sunucu değerleri (SMTP parolası dahil) yer tutucu. Geçmişte kurumsal sunucu/adres bilgileri vardı (sır değil, PR #21 ile temizlendi).
+6. **origin/main → sunucu senkronu (onaylı, 2026-11-28):** SSH ilk denemede zaman aşımına uğradı; ikinci denemede erişim geri geldi. Yedek `/root/yedekler/pre-sync-20261128/` (`.env`, `databases.yaml`, eski `notifications.yaml`, `vault-init.py`, `.dockerignore`, `head.txt`; hepsi mod 600 veya root-only klasör). Eski çalışan imaja `rollback-20261128` etiketi verildi (`d2d51d13`); hiçbir imaj silinmedi. Sunucu repo'su `b0c0e5c` → `900068f` fast-forward. Yerel `scripts/vault-init.py` farkı yalnızca mod (755→644) idi, 755'e döndürüldü. `notifications.yaml` yer tutucuya döndü (`enabled: false`). `dwh-monitor` yeniden build edildi (yeni imaj `7efce8cdd8cc`), `--no-build` ile yeniden başlatıldı. `/health` ok, `persist_ok: true`, Prometheus hedefleri (`dwh-metrics`, `prometheus`, `alertmanager`) up, 6 kural ok, son 5 dakikada log hatası yok. `.env` ve `databases.yaml` git'te izlenmiyor.
+
+### Bulgular
+- Git geçmişindeki (`b0c0e5c` dahil) `notifications.yaml` sürümü SMTP sunucusu ve adres bilgileri içeriyor; parola alanı ve Bearer değeri yer tutucu. Değer yazdırılmadan doğrulandı.
+- Retention'ın partition ekleme adımı arşivlemeden sonra çalışıyor; arşivleme hata verirse partition da eklenmez. 2027 kapsamı kapatıldı, 2028 için kalıcı kural açık.
+
+### Sonraki
+Bkz. `task.md` "Sonraki oturumda yapılacaklar": parola döndürme (kullanıcı), SuperBI bağlantı testi (kullanıcı), PR #3 staging testi. Senkron tamamlandı (madde 6).
+
+---
+
 ## Oturum 15 — PR #2 birleştirme, sır dosyalarının git'ten çıkarılması, sunucu dağıtımı, md güncellemesi (2026-11-25)
 
 ### Yapılanlar
