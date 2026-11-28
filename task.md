@@ -139,7 +139,7 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 11. Harici disk kopyasının (Windows, aylık) çalıştığını doğrula; sunucudan doğrulanamıyor.
 12. Rakip analizi → DB2 / MongoDB / Teradata önceliklerini belirle.
 13. F6-03 Grafana panoları, F6-05 yatay ölçekleme (düşük öncelik).
-14. **origin/main → sunucu senkronu (onay bekliyor):** Fark 10 commit / 28 dosya (PR #20, #21, #22, helm, CI helm işi, doküman). `config/notifications.yaml` yer tutucuya dönecek: sunucudaki SMTP ayarları (sır değil) önce yedeklenmeli. Adımlar: yedek, fark incelemesi, `promtool`/`compose config` kontrolü, `dwh-monitor` yeniden build ve oluşturma, sağlık kontrolü.
+14. ~~**origin/main → sunucu senkronu (onay bekliyor)**~~ ✅ **Tamamlandı (2026-11-28):** Sunucu `b0c0e5c` → `900068f`, 28 dosya. Yedek `/root/yedekler/pre-sync-20261128/`, `rollback-20261128` etiketi. `dwh-monitor` yeni imajla (`7efce8cdd8cc`) çalışıyor, `/health` ok. `notifications.yaml` yer tutucuda (SMTP gerçek değerleri yalnızca yedekte; gerçek değerlerin nereye konacağı açık karar).
 
 ---
 
@@ -179,6 +179,7 @@ Birleşenler (main'de, 2026-11-25 `gh pr list --state merged`): #1, #2, #4, #6, 
 | 2026-11-25 | PR #18 sır dosyaları | `587146d`: `config/databases.yaml` git'ten çıktı, örnek ve dokümanlar yer tutucu, `tests/test_config_example.py` |
 | 2026-11-25 | Sunucu dağıtımı (`origin/main` `b0c0e5c`) | Dağıtım öncesi yedek `/root/yedekler/pre-deploy-20261125-1308`; `.env`'e `DQ_DB_PASSWORD`; yalnızca `dwh-monitor` yeniden build; `persist_ok: true`; Prometheus 3/3 up; 6 kural yüklü; firing alarm 0. Parolalar değişmedi |
 | 2026-11-27 | F14 partition 2027 | `dwh_health_log_2027_01`…`_12` eklendi (`add_monthly_partition`, idempotent); transaction içi yazma testi geri alındı |
+| 2026-11-28 | origin/main → sunucu senkronu | `b0c0e5c` → `900068f` (fast-forward, 28 dosya); yedek `/root/yedekler/pre-sync-20261128/`; `rollback-20261128` etiketi; `dwh-monitor` yeni imajla (`7efce8cdd8cc`) yeniden oluşturuldu; `/health` ok, 3/3 hedef up, 6/6 kural ok |
 | 2026-11-27 | PR #23 `.dockerignore` | Gerçek yapılandırma ve `.claude/` imaja girmiyor (`900068f`); sunucuda yalnızca imaj yeniden build edildi (mevcut kod, `d2d51d13`) |
 | 2026-11-25 | PR #3 / #8 CI ve düzeltmeler | Dallar `origin/main` ile birleştirilip CI tetiklendi (`5582b78`, `ddea741`); helm `DB_USER` `apache` (`df64bce`); PR açıklamalarına doğrulama eksikleri yazıldı |
 | 2026-11-25 | PR #5 kapatıldı | PR #18 ile değiştirildi |
